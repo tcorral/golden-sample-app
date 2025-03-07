@@ -60,9 +60,7 @@ jobs:
         echo "Final prompt content:"
         cat prompt.txt
         
-        # Run Aider with commit message in the prompt
-        { echo -e "$(cat prompt.txt)\n\nCOMMIT_MESSAGE: Fix locale selector - ${{ github.event.issue.title }} (#${{ github.event.issue.number }})"; } | \
-          aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES
+        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES
 
     - name: Check for changes
       id: changes
