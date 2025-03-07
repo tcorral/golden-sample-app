@@ -36,18 +36,22 @@ export class LocalesService {
     );
 
     if (locale !== currentLocale) {
-      const fullPath = this.location.path(true);
-      const basePathRegex = new RegExp(`^${baseHref}/${currentLocale}/?`);
-
-      // Check if path includes base href and locale
-      if (!basePathRegex.test(fullPath)) {
-        return;
+      // Force reload with the new locale
+      const currentPath = this.document.location.pathname;
+      const localePattern = new RegExp(`^${baseHref}/${currentLocale}/`);
+      
+      let newPath;
+      if (localePattern.test(currentPath)) {
+        // Replace current locale in the path
+        newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
+      } else {
+        // Add new locale to the path
+        newPath = `${baseHref}/${locale}${currentPath.startsWith(baseHref) ? currentPath.substring(baseHref.length) : currentPath}`;
       }
-
-      // Get path without base href and locale
-      const path = fullPath.replace(basePathRegex, '');
-
-      this.document.location.href = `${baseHref}/${locale}/${path}`;
+      
+      // Preserve query parameters and hash
+      const queryAndHash = this.document.location.search + this.document.location.hash;
+      this.document.location.href = newPath + queryAndHash;
     }
   }
 
