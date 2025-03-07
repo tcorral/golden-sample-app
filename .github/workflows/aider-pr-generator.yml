@@ -1,102 +1,186 @@
-name: Aider Auto Code Update
+name: Aider Automation
 
 on:
   issues:
     types: [opened, labeled]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: read
-
 jobs:
-  process-issue:
+  aider-automate:
+    if: ${{ github.event.label.name == 'aider' || contains(github.event.issue.labels.*.name, 'aider') }}
     runs-on: ubuntu-latest
-    if: contains(join(github.event.issue.labels.*.name, ','), 'aider')
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Install system dependencies
-      run: sudo apt-get install -y build-essential python3-dev
+      - name: Install Aider
+        run: |
+          pip install aider-chat
+          pip install GitPython
 
-    - name: Install Python build dependencies
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
+      - name: Parse issue and run Aider
+        id: run-aider
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python -c "
+          import os
+          import re
+          import subprocess
+          import git
+          import json
+          
+          # Get issue details
+          issue_number = os.environ['ISSUE_NUMBER']
+          issue_title = os.environ['ISSUE_TITLE']
+          issue_body = os.environ['ISSUE_BODY']
+          
+          # Parse issue body to extract sections
+          description = ''
+          files_to_modify = []
+          acceptance_criteria = ''
+          
+          description_match = re.search(r'## Description\s+(.*?)(?=##|\Z)', issue_body, re.DOTALL)
+          if description_match:
+              description = description_match.group(1).strip()
+          
+          files_match = re.search(r'## Files to modify\s+(.*?)(?=##|\Z)', issue_body, re.DOTALL)
+          if files_match:
+              files_text = files_match.group(1).strip()
+              # Extract filenames (assuming one filename per line or comma-separated)
+              files_to_modify = [f.strip() for f in re.split(r'[\n,]', files_text) if f.strip()]
+          
+          criteria_match = re.search(r'## Acceptance criteria\s+(.*?)(?=##|\Z)', issue_body, re.DOTALL)
+          if criteria_match:
+              acceptance_criteria = criteria_match.group(1).strip()
+          
+          # Create a new branch
+          repo = git.Repo('.')
+          branch_name = f'fix/issue-{issue_number}'
+          
+          # Make sure we're on the main branch first
+          repo.git.checkout('main')
+          
+          # Create a new branch or checkout if it exists
+          try:
+              repo.git.checkout('-b', branch_name)
+              print(f'Created and switched to branch {branch_name}')
+          except git.GitCommandError:
+              repo.git.checkout(branch_name)
+              print(f'Switched to existing branch {branch_name}')
+          
+          # Construct prompt for Aider
+          prompt = f\"\"\"
+          # Task: {issue_title}
+          
+          ## Description
+          {description}
+          
+          ## Acceptance Criteria
+          {acceptance_criteria}
+          
+          Please implement the necessary changes to address this issue.
+          \"\"\"
+          
+          # Write prompt to a file for debugging
+          with open('aider_prompt.txt', 'w') as f:
+              f.write(prompt)
+          
+          # Run Aider with the appropriate files
+          aider_command = ['aider']
+          if files_to_modify:
+              aider_command.extend(files_to_modify)
+          
+          # Run Aider with the prompt
+          process = subprocess.Popen(
+              aider_command,
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True
+          )
+          
+          stdout, stderr = process.communicate(input=prompt)
+          
+          # Check if Aider made any changes
+          status = repo.git.status('--porcelain')
+          if status:
+              # Commit changes
+              repo.git.add('.')
+              repo.git.commit('-m', f'Fix issue #{issue_number}: {issue_title}')
+              
+              # Push changes
+              repo.git.push('--set-upstream', 'origin', branch_name)
+              
+              # Write PR details for next step
+              pr_title = f'Fix issue #{issue_number}: {issue_title}'
+              pr_body = f'''
+              This PR addresses issue #{issue_number}
+              
+              ## Description
+              {description}
+              
+              ## Acceptance Criteria
+              {acceptance_criteria}
+              
+              Automated changes made by Aider.
+              '''
+              
+              with open('pr_details.json', 'w') as f:
+                  json.dump({
+                      'title': pr_title,
+                      'body': pr_body,
+                      'branch': branch_name
+                  }, f)
+              
+              print(f'::set-output name=changes_made::true')
+              print(f'::set-output name=branch_name::{branch_name}')
+          else:
+              print('No changes were made by Aider')
+              print(f'::set-output name=changes_made::false')
+          "
 
-    - name: Install Aider
-      run: pip install aider-chat boto3
+      - name: Create Pull Request
+        if: steps.run-aider.outputs.changes_made == 'true'
+        run: |
+          PR_DETAILS=$(cat pr_details.json)
+          PR_TITLE=$(echo $PR_DETAILS | jq -r '.title')
+          PR_BODY=$(echo $PR_DETAILS | jq -r '.body')
+          BRANCH_NAME=$(echo $PR_DETAILS | jq -r '.branch')
+          
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create working branch
-      run: |
-        BRANCH_NAME="aider-fix-${{ github.event.issue.number }}"
-        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-        git checkout -b $BRANCH_NAME
+      - name: Comment on Issue
+        if: steps.run-aider.outputs.changes_made == 'true'
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "I've created a pull request to address this issue using Aider. Please review the changes."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract issue sections
-      id: extract-sections
-      run: |
-        # Clean markdown formatting and extract files
-        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g; s/\*\*//g; s/^[#*-] *//')
-        FILES=$(echo "$BODY" | awk '/Files to modify/{flag=1; next} /Acceptance criteria/{flag=0} flag' | 
-                xargs -n1 | while read -r path; do
-                  [ -d "$path" ] && find "$path" -type f || echo "$path"
-                done | sort -u | tr '\n' ' ')
-        
-        # Create prompt with Angular-specific instructions
-        PROMPT="Problem: $(echo "$BODY" | awk '/Description/{flag=1; next} /Files to modify/{flag=0} flag' | tr '\n' ' ')
-        Requirements: $(echo "$BODY" | awk '/Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag' | tr '\n' ' ')
-        Implementation Notes: Use Angular services for cookie handling, update component state, ensure template bindings"
-        
-        echo "$FILES" > files.txt
-        echo "$PROMPT" > prompt.txt
-
-    - name: Run Aider with debugging
-      env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      run: |
-        echo "=== Validated Files ==="
-        cat files.txt
-        echo "=== Final Prompt ==="
-        cat prompt.txt
-        echo "=== Current Branch ==="
-        git branch
-        
-        # Run Aider and capture output
-        aider --yes --model anthropic/claude-3-7-sonnet-latest $(cat files.txt) <<< "$(cat prompt.txt)" 2>&1 | tee aider.log
-        
-        echo "=== Aider Output ==="
-        cat aider.log
-        echo "=== Git Status ==="
-        git status --porcelain
-        echo "=== Recent Commits ==="
-        git log --oneline -n 3
-
-    - name: Push changes
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add -A
-        git commit -m "Apply Aider fixes for #${{ github.event.issue.number }}" || echo "No changes to commit"
-        git push origin ${{ env.BRANCH_NAME }} --force-with-lease
-
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v5
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        title: "fix: ${{ github.event.issue.title }}"
-        body: |
-          **Automated Fixes**
-          - Addresses issue #${{ github.event.issue.number }}
-          - Modified files:
-            $(cat files.txt | tr ' ' '\n' | sed 's/^/- /')
-        branch: ${{ env.BRANCH_NAME }}
-        base: main
-        delete-branch: false
+      - name: Report No Changes
+        if: steps.run-aider.outputs.changes_made == 'false'
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "Aider attempted to fix this issue but did not make any changes. Please review the issue description and try again."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
