@@ -25,6 +25,20 @@ jobs:
         with:
           python-version: '3.11'
       
+      - name: Check OpenAI API connectivity
+        run: |
+            echo "Testing OpenAI API connectivity..."
+
+            curl --fail --max-time 10 -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/v1/models || {
+                echo "⚠️ OpenAI API is unreachable. Retrying in 30 seconds..."
+                sleep 30
+                curl --fail --max-time 10 -H "Authorization: Bearer $OPENAI_API_KEY" https://api.openai.com/v1/models || {
+                    echo "❌ OpenAI API is still unreachable. Exiting."
+                    exit 1
+                }
+            }
+
+            echo "✅ OpenAI API is reachable! Running Aider..."
       - name: Install Aider and GitHub CLI
         run: |
           pip install aider-chat
