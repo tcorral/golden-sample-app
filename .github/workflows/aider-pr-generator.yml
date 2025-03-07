@@ -49,25 +49,31 @@ jobs:
       
       - name: Run Aider to implement requested changes
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AIDER_AUTO_CONFIRM: "true"
           PYTHONIOENCODING: "utf-8"
+          AIDER_MODEL: "claude-3"  # You can choose from available models like claude-1, claude-2, or claude-3
         run: |
-          # Extract file paths if they're included in the issue body (optional)
-          FILES=$(grep -i "^files to modify:" issue_instructions.md -A 10 | grep -v "^files to modify:" | grep -v "^$" | sed 's/^- //' | tr '\n' ' ' || echo "")
-          
-          # Create a script that will apply the message to Aider
-          echo "Creating message file for Aider"
-          cat issue_instructions.md > aider_message.txt
-          
-          # Run Aider with appropriate options - using only available flags
-          if [ -n "$FILES" ]; then
-            echo "Focusing on specific files: $FILES"
-            aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt $FILES
-          else
-            echo "No specific files mentioned, scanning entire repository"
-            aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt
+          # Ensure the Anthropic API key is set
+          if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+            echo "ERROR: ANTHROPIC_API_KEY is missing or invalid"
+            exit 1
           fi
+
+          # Check if the Anthropic API is reachable
+          curl --fail --max-time 10 -H "Authorization: Bearer $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/models || {
+            echo "⚠️ Anthropic API is unreachable. Retrying in 30 seconds..."
+            sleep 30
+            curl --fail --max-time 10 -H "Authorization: Bearer $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/models || {
+              echo "❌ Anthropic API is still unreachable. Exiting."
+              exit 1
+            }
+          }
+
+          echo "✅ Anthropic API is reachable! Running Aider..."
+
+          # Run Aider with Anthropic API settings
+          aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt --model $AIDER_MODEL --api-key $ANTHROPIC_API_KEY
       
       - name: Check for changes
         id: check_changes
