@@ -70,7 +70,7 @@ jobs:
         git branch
         
         # Run Aider and capture output
-        aider --yes --model claude-3-opus $(cat files.txt) <<< "$(cat prompt.txt)" 2>&1 | tee aider.log
+        aider --yes --model anthropic/claude-3-7-sonnet-latest $(cat files.txt) <<< "$(cat prompt.txt)" 2>&1 | tee aider.log
         
         echo "=== Aider Output ==="
         cat aider.log
