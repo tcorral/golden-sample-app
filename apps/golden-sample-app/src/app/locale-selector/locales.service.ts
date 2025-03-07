@@ -7,8 +7,9 @@ export const LOCALES_LIST = new InjectionToken<Array<string>>(
 );
 
 // Use 2038 year to avoid issues with some browsers that don't support dates after 2038
+// Adding max-age as a fallback for browsers that might have issues with expires
 const COOKIE_ATTRIBUTES =
-  'expires=Tue, 19 Jan 2038 04:14:07 GMT; secure; samesite=Lax;';
+  'expires=Tue, 19 Jan 2038 04:14:07 GMT; max-age=2147483647; secure; samesite=Lax;';
 
 @Injectable()
 export class LocalesService {
@@ -31,6 +32,7 @@ export class LocalesService {
     )}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
 
+    // Set the cookie with proper attributes
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
@@ -40,14 +42,16 @@ export class LocalesService {
       const basePathRegex = new RegExp(`^${baseHref}/${currentLocale}/?`);
 
       // Check if path includes base href and locale
-      if (!basePathRegex.test(fullPath)) {
-        return;
+      if (basePathRegex.test(fullPath)) {
+        // Get path without base href and locale
+        const path = fullPath.replace(basePathRegex, '');
+        // Redirect to the new locale URL
+        this.document.location.href = `${baseHref}/${locale}/${path}`;
+      } else {
+        // If the current URL doesn't follow the expected pattern,
+        // just redirect to the root with the new locale
+        this.document.location.href = `${baseHref}/${locale}/`;
       }
-
-      // Get path without base href and locale
-      const path = fullPath.replace(basePathRegex, '');
-
-      this.document.location.href = `${baseHref}/${locale}/${path}`;
     }
   }
 

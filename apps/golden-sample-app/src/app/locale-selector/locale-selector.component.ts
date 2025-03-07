@@ -19,10 +19,19 @@ export class LocaleSelectorComponent implements OnInit {
 
   set language(value: string | object | Locale | undefined) {
     if (typeof value === 'string') {
+      // If it's a string, try to find the locale by code
+      const locale = this.findLocale(value);
+      if (locale) {
+        this.localeService.setLocale(locale.code);
+        this.currentLanguage = locale;
+      }
       return;
     }
 
-    this.localeService.setLocale((value as Locale).code);
+    if (value && 'code' in value) {
+      this.localeService.setLocale((value as Locale).code);
+      this.currentLanguage = value as Locale;
+    }
   }
 
   get language(): Locale | undefined {
