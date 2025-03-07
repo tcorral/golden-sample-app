@@ -18,11 +18,13 @@ export class LocaleSelectorComponent implements OnInit {
   ) {}
 
   set language(value: string | object | Locale | undefined) {
-    if (typeof value === 'string') {
+    if (typeof value === 'string' || !value) {
       return;
     }
 
-    this.localeService.setLocale((value as Locale).code);
+    const locale = value as Locale;
+    this.currentLanguage = locale;
+    this.localeService.setLocale(locale.code);
   }
 
   get language(): Locale | undefined {
@@ -31,11 +33,21 @@ export class LocaleSelectorComponent implements OnInit {
 
   ngOnInit() {
     this.localesCatalog = this.locales.reduce(
-      (acc: Locale[], locale) => [...acc, localesCatalog[locale]],
+      (acc: Locale[], locale) => {
+        if (localesCatalog[locale]) {
+          return [...acc, localesCatalog[locale]];
+        }
+        return acc;
+      },
       []
     );
 
     this.currentLanguage = this.findLocale(this.localeService.currentLocale);
+    
+    // If no current language is set, use the first available locale
+    if (!this.currentLanguage && this.localesCatalog.length > 0) {
+      this.currentLanguage = this.localesCatalog[0];
+    }
   }
 
   private findLocale(locale: string): Locale | undefined {

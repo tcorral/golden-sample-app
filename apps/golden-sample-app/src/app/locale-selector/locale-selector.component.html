@@ -4,9 +4,10 @@
   optionLabelKey="language"
   icon="caret-down"
   [options]="localesCatalog"
+  [selected]="language"
   (select)="language = $event"
 >
   <ng-template bbDropdownLabel>
-    <span>{{ language?.language }}</span>
+    <span>{{ language?.language || 'Select language' }}</span>
   </ng-template>
 </bb-dropdown-menu-ui>

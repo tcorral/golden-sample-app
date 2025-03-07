@@ -19,6 +19,11 @@ export class LocalesService {
   ) {}
 
   setLocale(locale: string) {
+    if (!locale) {
+      console.error('Attempted to set empty locale');
+      return;
+    }
+    
     const currentLocale = this.locale;
 
     // Get base href without locale
@@ -31,6 +36,7 @@ export class LocalesService {
     )}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
 
+    // Set the cookie
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
@@ -39,14 +45,19 @@ export class LocalesService {
       const fullPath = this.location.path(true);
       const basePathRegex = new RegExp(`^${baseHref}/${currentLocale}/?`);
 
-      // Check if path includes base href and locale
+      // If the path doesn't include the current locale pattern, just reload the page
+      // This handles the case where the app might be at the root path
       if (!basePathRegex.test(fullPath)) {
+        // Construct a URL with the new locale
+        const newUrl = `${baseHref}/${locale}/`;
+        this.document.location.href = newUrl;
         return;
       }
 
       // Get path without base href and locale
       const path = fullPath.replace(basePathRegex, '');
 
+      // Navigate to the same path but with the new locale
       this.document.location.href = `${baseHref}/${locale}/${path}`;
     }
   }
