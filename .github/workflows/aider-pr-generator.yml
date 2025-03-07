@@ -30,9 +30,11 @@ jobs:
           ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
 
-          # Extract sections using awk.
+          # Extract "Description": text between "## Description" and the next markdown header.
           DESCRIPTION=$(echo "$ISSUE_BODY" | awk '/## Description/{flag=1; next} /^## /{if(flag){flag=0}} flag')
+          # Extract "Files to modify": text between "## Files to modify" and the next markdown header.
           FILES=$(echo "$ISSUE_BODY" | awk '/## Files to modify/{flag=1; next} /^## /{if(flag){flag=0}} flag')
+          # Extract "Acceptance criteria": text from "## Acceptance criteria" to the end.
           ACCEPTANCE=$(echo "$ISSUE_BODY" | awk '/## Acceptance criteria/{flag=1; next} flag')
 
           echo "ISSUE_TITLE<<EOF" >> $GITHUB_OUTPUT
@@ -64,8 +66,8 @@ jobs:
           # Set the model to Anthropics Sonnet 3.7 (alias "sonnet")
           AIDER_MODEL: ${{ secrets.AIDER_MODEL || 'sonnet' }}
         run: |
-          # Build the prompt from the issue content.
-          PROMPT="Issue Title: ${{ steps.parse_issue.outputs.ISSUE_TITLE }}
+          # Build the command message from the issue content.
+          MESSAGE="Issue Title: ${{ steps.parse_issue.outputs.ISSUE_TITLE }}
 
             Description:
             ${{ steps.parse_issue.outputs.DESCRIPTION }}
@@ -73,20 +75,20 @@ jobs:
             Acceptance Criteria:
             ${{ steps.parse_issue.outputs.ACCEPTANCE }}"
 
-          echo "Using prompt:"
-          echo "$PROMPT"
+          echo "Using message:"
+          echo "$MESSAGE"
 
-          # If "Files to modify" is provided, clean up the file list.
+          # If "Files to modify" is provided, clean and resolve the file list.
           if [ -n "${{ steps.parse_issue.outputs.FILES }}" ]; then
             RAW_FILES="${{ steps.parse_issue.outputs.FILES }}"
-            # Remove markdown bullet markers (*) and trim whitespace.
+            # Remove bullet markers (*) and extra whitespace, then collapse to one line.
             CLEAN_FILES=$(echo "$RAW_FILES" | sed 's/^\s*\*\s*//g' | tr '\n' ' ')
             echo "Resolved files to modify: $CLEAN_FILES"
-            # Pass files as separate arguments.
-            aider --model "$AIDER_MODEL" --prompt "$PROMPT" $CLEAN_FILES
+            # Pass the cleaned file list as positional arguments.
+            aider --model "$AIDER_MODEL" --message "$MESSAGE" $CLEAN_FILES
           else
             echo "No files provided; analyzing entire repository."
-            aider --model "$AIDER_MODEL" --prompt "$PROMPT"
+            aider --model "$AIDER_MODEL" --message "$MESSAGE"
           fi
 
       - name: Commit changes
