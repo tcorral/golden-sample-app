@@ -7,11 +7,17 @@ on:
 jobs:
   process_aider_issue:
     runs-on: ubuntu-latest
-    # Only run if the issue has a label named "aider"
     if: contains(github.event.issue.labels.*.name, 'aider')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Install Aider CLI
+        run: |
+          # Download the latest Aider CLI binary for Linux from the official repository.
+          curl -L https://github.com/aider-ai/aider/releases/latest/download/aider-linux-amd64 -o aider
+          chmod +x aider
+          sudo mv aider /usr/local/bin/
 
       - name: Parse issue body for sections
         id: parse_issue
@@ -20,14 +26,14 @@ jobs:
           ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
 
-          # Extract "Description": text between "## Description" and next "##"
+          # Extract "Description": text between "## Description" and the next markdown header.
           DESCRIPTION=$(echo "$ISSUE_BODY" | awk '/## Description/{flag=1; next} /^## /{if(flag){flag=0}} flag')
-          # Extract "Files to modify": text between "## Files to modify" and next "##"
+          # Extract "Files to modify": text between "## Files to modify" and the next markdown header.
           FILES=$(echo "$ISSUE_BODY" | awk '/## Files to modify/{flag=1; next} /^## /{if(flag){flag=0}} flag')
-          # Extract "Acceptance criteria": text from "## Acceptance criteria" to the end
+          # Extract "Acceptance criteria": text from "## Acceptance criteria" until the end.
           ACCEPTANCE=$(echo "$ISSUE_BODY" | awk '/## Acceptance criteria/{flag=1; next} flag')
 
-          # Write outputs so later steps can use them
+          # Set outputs for later steps.
           echo "ISSUE_TITLE<<EOF" >> $GITHUB_OUTPUT
           echo "$ISSUE_TITLE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -44,16 +50,18 @@ jobs:
           echo "$ACCEPTANCE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create branch for AIDER changes
+      - name: Create branch for Aider changes
         id: create_branch
         run: |
           BRANCH="aider-${{ github.event.issue.number }}"
           git checkout -b "$BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_ENV
 
-      - name: Run AIDER
+      - name: Run Aider
+        env:
+          AIDER_API_KEY: ${{ secrets.AIDER_API_KEY }}
         run: |
-          # Build the prompt from the issue content
+          # Build the prompt from the issue content.
           PROMPT="Issue Title: ${{ steps.parse_issue.outputs.ISSUE_TITLE }}
 
             Description:
@@ -65,11 +73,10 @@ jobs:
           echo "Using prompt:"
           echo "$PROMPT"
 
-          # If "Files to modify" is provided, pass them to aider; otherwise, analyze the whole repository.
+          # If a list of files is provided, pass them to Aider; otherwise, analyze the entire repository.
           if [ -n "${{ steps.parse_issue.outputs.FILES }}" ]; then
             FILES_TO_MODIFY="${{ steps.parse_issue.outputs.FILES }}"
             echo "Files to modify provided: $FILES_TO_MODIFY"
-            # Run aider with the specified file(s)
             aider --prompt "$PROMPT" --files "$FILES_TO_MODIFY"
           else
             echo "No files provided; analyzing entire repository."
