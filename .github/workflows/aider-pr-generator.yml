@@ -28,6 +28,8 @@ jobs:
         run: |
           pip install aider-chat
           pip install GitPython
+          # Print aider version for debugging
+          aider --version
 
       - name: Parse issue and prepare for Aider
         id: parse-issue
@@ -138,7 +140,7 @@ jobs:
           echo "Running Aider with prompt:"
           echo "$PROMPT"
           
-          # Create an Aider script that will run non-interactively
+          # Create an Aider script that will run with a modified approach
           cat > run_aider.py << 'EOF'
           import os
           import sys
@@ -154,32 +156,34 @@ jobs:
           with open('aider_prompt.txt', 'r') as f:
               prompt = f.read()
           
-          # Get Anthropic API key from environment
+          # Get ANTHROPIC API key from environment
           anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
           if not anthropic_api_key:
               print("Error: ANTHROPIC_API_KEY environment variable not set")
               sys.exit(1)
           
-          # Prepare Aider command
+          # Prepare basic Aider command
           aider_cmd = ['aider', '--no-auto-commit', '--yes']
           
           # Add files to modify if specified
           if files_to_modify:
               aider_cmd.extend(files_to_modify)
           
-          # Add --apply flag to run non-interactively
-          aider_cmd.append('--apply')
-          
-          # Write prompt to a temporary file that Aider can read
+          # Write prompt to a file that Aider can read
           prompt_file = Path('prompt_for_aider.txt')
           prompt_file.write_text(prompt)
           
-          # Add prompt file to command
-          aider_cmd.extend(['--message-file', 'prompt_for_aider.txt'])
-          
-          # Run Aider
+          # Set up a way to capture and send the prompt to Aider
           print(f"Running command: {' '.join(aider_cmd)}")
-          result = subprocess.run(aider_cmd, capture_output=True, text=True)
+          
+          # Run Aider with input from prompt file
+          with open('prompt_for_aider.txt', 'r') as prompt_file:
+              result = subprocess.run(
+                  aider_cmd,
+                  stdin=prompt_file,
+                  capture_output=True,
+                  text=True
+              )
           
           # Log the output
           print("Aider stdout:")
@@ -192,7 +196,13 @@ jobs:
           print(f"Aider exit code: {result.returncode}")
           
           # Write true/false to a file based on whether changes were made
-          changes_made = result.returncode == 0 and "No changes to commit" not in result.stdout
+          # We need to check git status for changes since Aider doesn't auto-commit
+          git_status = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+          changes_made = bool(git_status.stdout.strip())
+          
+          print(f"Git status output: {git_status.stdout}")
+          print(f"Changes detected: {changes_made}")
+          
           with open('changes_made.txt', 'w') as f:
               f.write(str(changes_made).lower())
           EOF
@@ -239,11 +249,11 @@ jobs:
           ACCEPTANCE_CRITERIA=$(echo $ISSUE_INFO | jq -r '.acceptance_criteria')
           
           PR_TITLE="Fix issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
-          PR_BODY="This PR addresses issue #${ISSUE_NUMBER} \
-            ## Description \
-            ${DESCRIPTION} \
-            ## Acceptance Criteria \
-            ${ACCEPTANCE_CRITERIA} \
+          PR_BODY="This PR addresses issue #${ISSUE_NUMBER}
+            ## Description\
+            ${DESCRIPTION}\
+            ## Acceptance Criteria\
+            ${ACCEPTANCE_CRITERIA}\
             Automated changes made by Aider."
           
           gh pr create \
