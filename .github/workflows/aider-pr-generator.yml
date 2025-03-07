@@ -54,13 +54,17 @@ jobs:
           # Extract file paths if they're included in the issue body (optional)
           FILES=$(grep -i "^files to modify:" issue_instructions.md -A 10 | grep -v "^files to modify:" | grep -v "^$" | sed 's/^- //' | tr '\n' ' ' || echo "")
           
+          # Create a script that will apply the message to Aider
+          echo "Creating message file for Aider"
+          cat issue_instructions.md > aider_message.txt
+          
           # Run Aider with appropriate options
           if [ -n "$FILES" ]; then
             echo "Focusing on specific files: $FILES"
-            aider --no-git --apply-edits true --input-file issue_instructions.md --message "Implement changes for issue #${{ env.ISSUE_NUMBER }}" $FILES
+            aider --no-git --message-file aider_message.txt $FILES
           else
             echo "No specific files mentioned, scanning entire repository"
-            aider --no-git --apply-edits true --input-file issue_instructions.md --message "Implement changes for issue #${{ env.ISSUE_NUMBER }}"
+            aider --no-git --message-file aider_message.txt
           fi
       
       - name: Check for changes
