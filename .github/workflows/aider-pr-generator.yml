@@ -160,7 +160,7 @@ jobs:
       
       - name: Download files mentioned in the issue
         run: |
-          for file in "${{ env.FILES_LIST[@] }}"; do
+          for file in ${{ env.FILES_LIST }}; do
             echo "Downloading file: $file"
             if [ -f "$file" ]; then
               echo "File $file found, adding to Aider message."
