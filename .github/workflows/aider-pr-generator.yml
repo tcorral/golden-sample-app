@@ -43,55 +43,60 @@ jobs:
     - name: Extract issue sections
       id: extract-sections
       run: |
-        # Extract and flatten markdown content
-        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g')
+        # Clean markdown formatting and extract files
+        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g; s/\*\*//g; s/^[#*-] *//')
+        FILES=$(echo "$BODY" | awk '/Files to modify/{flag=1; next} /Acceptance criteria/{flag=0} flag' | 
+                xargs -n1 | while read -r path; do
+                  [ -d "$path" ] && find "$path" -type f || echo "$path"
+                done | sort -u | tr '\n' ' ')
         
-        # Extract components and convert to single line
-        DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## Files to modify/{flag=0} flag' | tr '\n' ' ' | sed 's/\*\*//g; s/  \+/ /g')
-        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## Acceptance criteria/{flag=0} flag' | sed -e 's/^- //' -e '/^$/d' -e 's/^ *//' | xargs -n 1 sh -c '[ -f "$0" ] && echo "$0"' | tr '\n' ' ')
-        ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag' | tr '\n' ' ' | sed 's/\*\*//g; s/  \+/ /g; s/\. /. /g')
-
-        # Create single-line prompt with section markers
-        PROMPT="PROBLEM: ${DESCRIPTION} | BEHAVIOR: ${ACCEPTANCE} | FILES: ${FILES} | REQUIREMENTS: Implement all fixes in one pass following Angular best practices, update tests, ensure cookie handling works cross-browser"
+        # Create prompt with Angular-specific instructions
+        PROMPT="Problem: $(echo "$BODY" | awk '/Description/{flag=1; next} /Files to modify/{flag=0} flag' | tr '\n' ' ')
+        Requirements: $(echo "$BODY" | awk '/Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag' | tr '\n' ' ')
+        Implementation Notes: Use Angular services for cookie handling, update component state, ensure template bindings"
         
-        echo "$PROMPT" > prompt.txt
         echo "$FILES" > files.txt
+        echo "$PROMPT" > prompt.txt
 
-    - name: Run Aider
+    - name: Run Aider with debugging
       env:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
-        FILES=$(tr ' ' '\n' < files.txt | xargs -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
-        echo "Validated files: $FILES"
-        echo "Final prompt content:"
+        echo "=== Validated Files ==="
+        cat files.txt
+        echo "=== Final Prompt ==="
         cat prompt.txt
-        aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt)
-  
-    - name: Check for Aider changes
-      run: |
-        echo "Current branch: $(git branch --show-current)"
-        echo "Commit history:"
+        echo "=== Current Branch ==="
+        git branch
+        
+        # Run Aider and capture output
+        aider --yes --model claude-3-opus $(cat files.txt) <<< "$(cat prompt.txt)" 2>&1 | tee aider.log
+        
+        echo "=== Aider Output ==="
+        cat aider.log
+        echo "=== Git Status ==="
+        git status --porcelain
+        echo "=== Recent Commits ==="
         git log --oneline -n 3
-        echo "Changes vs main:"
-        git fetch origin main
-        git diff origin/main HEAD --stat
-  
-    - name: Push branch
+
+    - name: Push changes
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
+        git add -A
+        git commit -m "Apply Aider fixes for #${{ github.event.issue.number }}" || echo "No changes to commit"
         git push origin ${{ env.BRANCH_NAME }} --force-with-lease
-        echo "Pushed branch successfully"
-  
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         title: "fix: ${{ github.event.issue.title }}"
         body: |
-          Automated fixes for issue #${{ github.event.issue.number }}
-          - Implemented by Aider AI assistant
-          - Branch: ${{ env.BRANCH_NAME }}
+          **Automated Fixes**
+          - Addresses issue #${{ github.event.issue.number }}
+          - Modified files:
+            $(cat files.txt | tr ' ' '\n' | sed 's/^/- /')
         branch: ${{ env.BRANCH_NAME }}
         base: main
         delete-branch: false
