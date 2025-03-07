@@ -17,7 +17,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'  # Use supported Python version
+        python-version: '3.11'
 
     - name: Install system dependencies
       run: sudo apt-get install -y build-essential python3-dev
@@ -32,31 +32,30 @@ jobs:
     - name: Extract issue sections
       id: extract-sections
       run: |
+        # Extract components from issue body
         BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g')
-        DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## |^$/{flag=0} flag')
-        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## |^$/{flag=0} flag' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr -d '\r')
-        ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /## |^$/{flag=0} flag')
+        DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## Files to modify/{flag=0} flag')
+        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## Acceptance criteria/{flag=0} flag' | sed -e 's/^* //' -e '/^$/d' -e 's/^ *//' | sort -u)
+        ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag')
 
-        # Process files/directories
+        # Process directories to find actual files
         PROCESSED_FILES=""
         if [ -n "$FILES" ]; then
-          while IFS= read -r line; do
-            for item in $line; do
-              if [ -d "$item" ]; then
-                PROCESSED_FILES+=" $(find "$item" -type f -print0 | xargs -0)"
-              elif [ -f "$item" ]; then
-                PROCESSED_FILES+=" $item"
-              fi
-            done
+          while IFS= read -r path; do
+            if [ -d "$path" ]; then
+              PROCESSED_FILES+=" $(find "$path" -type f -print0 | xargs -0)"
+            elif [ -f "$path" ]; then
+              PROCESSED_FILES+=" $path"
+            fi
           done <<< "$FILES"
         else
-          # Get all files in repo (excluding directories)
-          PROCESSED_FILES=$(git ls-files -z | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
+          PROCESSED_FILES=$(git ls-files | tr '\n' ' ')
         fi
 
-        # Remove duplicates and format
+        # Format final files list
         FILES=$(echo "$PROCESSED_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ $//')
         
+        # Create prompt
         PROMPT="Issue Title: ${{ github.event.issue.title }}\n\nDescription:\n$DESCRIPTION\n\nAcceptance Criteria:\n$ACCEPTANCE"
         echo -e "$PROMPT" > prompt.txt
         echo "$FILES" > files.txt
@@ -66,9 +65,9 @@ jobs:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
         FILES=$(cat files.txt)
-        echo "Processing files: $FILES"
-        # Use xargs to handle spaces in filenames properly
-        echo "$FILES" | xargs -n 1 | aider --yes --model claude-3-opus $(cat prompt.txt)
+        echo "Processing files:"
+        echo "$FILES"
+        cat prompt.txt | aider --yes --model claude-3-opus $FILES
 
     - name: Check for changes
       id: changes
@@ -85,9 +84,9 @@ jobs:
       run: |
         git config --global user.name "github-actions"
         git config --global user.email "actions@github.com"
-        BRANCH_NAME="aider-${{ github.event.issue.number }}"
+        BRANCH_NAME="aider-locale-fix-${{ github.event.issue.number }}"
         git checkout -b $BRANCH_NAME
-        git commit -m "Apply changes from Aider for issue #${{ github.event.issue.number }}"
+        git commit -m "Fix locale selector behavior (issue #${{ github.event.issue.number }})"
 
     - name: Push changes
       if: steps.changes.outputs.has_changes == 'true'
@@ -101,7 +100,7 @@ jobs:
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        title: "Aider changes for issue #${{ github.event.issue.number }}"
-        body: "Automated changes by Aider in response to issue #${{ github.event.issue.number }}"
+        title: "fix: Update locale selector functionality"
+        body: "Automated fixes for issue #${{ github.event.issue.number }}\n\n${{ steps.extract-sections.outputs.description }}"
         branch: $BRANCH_NAME
         base: main
