@@ -60,18 +60,6 @@ jobs:
             exit 1
           fi
 
-          # Check if the Anthropic API is reachable
-          curl --fail --max-time 10 -H "Authorization: Bearer $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/models || {
-            echo "⚠️ Anthropic API is unreachable. Retrying in 30 seconds..."
-            sleep 30
-            curl --fail --max-time 10 -H "Authorization: Bearer $ANTHROPIC_API_KEY" https://api.anthropic.com/v1/models || {
-              echo "❌ Anthropic API is still unreachable. Exiting."
-              exit 1
-            }
-          }
-
-          echo "✅ Anthropic API is reachable! Running Aider..."
-
           # Run Aider with Anthropic API settings
           aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt --model $AIDER_MODEL --api-key $ANTHROPIC_API_KEY
       
