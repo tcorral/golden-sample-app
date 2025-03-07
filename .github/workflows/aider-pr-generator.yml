@@ -76,13 +76,16 @@ jobs:
         run: |
           echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> $GITHUB_ENV
       
+      - name: Write prompt to file
+        run: |
+          cat > prompt.txt << 'EOL'
+          ${{ steps.parse-issue.outputs.aider-prompt }}
+          EOL
+      
       - name: Run Aider with files
         id: run-aider
-        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify).length != 0 }}
+        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify) != [] }}
         run: |
-          # Create prompt file
-          echo '${{ steps.parse-issue.outputs.aider-prompt }}' > prompt.txt
-          
           # Get the files list from output
           FILES=$(echo '${{ steps.parse-issue.outputs.files-to-modify }}' | jq -r '.[]')
           
@@ -92,11 +95,8 @@ jobs:
       
       - name: Run Aider on whole repository
         id: run-aider-whole-repo
-        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify).length == 0 }}
+        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify) == [] }}
         run: |
-          # Create prompt file
-          echo '${{ steps.parse-issue.outputs.aider-prompt }}' > prompt.txt
-          
           # Run aider on the whole repository
           echo "Running Aider on the whole repository"
           aider --no-auto-commits --apply-only < prompt.txt
