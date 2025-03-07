@@ -51,7 +51,7 @@ jobs:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
         FILES=$(cat files.txt)
-        aider --yes --input-file prompt.txt $FILES
+        cat prompt.txt | aider --yes $FILES
 
     - name: Check for changes
       id: changes
