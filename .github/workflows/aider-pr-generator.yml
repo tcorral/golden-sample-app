@@ -75,8 +75,8 @@ jobs:
             Acceptance Criteria:
             ${{ steps.parse_issue.outputs.ACCEPTANCE }}"
 
-          echo "Using prompt:"
-          echo "$PROMPT"
+                    echo "Using prompt:"
+                    echo "$PROMPT"
 
           # Use the provided files if any.
           if [ -n "${{ steps.parse_issue.outputs.FILES }}" ]; then
@@ -105,5 +105,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Aider AI Changes for Issue #${{ github.event.issue.number }}"
           body: "This PR applies the changes suggested by Aider AI for issue #${{ github.event.issue.number }} using Anthropics Sonnet 3.7."
-          head: ${{ env.branch }}
+          branch: ${{ env.branch }}
           base: main
