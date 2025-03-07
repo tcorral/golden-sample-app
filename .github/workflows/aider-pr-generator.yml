@@ -61,6 +61,13 @@ jobs:
         cat prompt.txt
         aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt)
 
+    - name: Debug Aider changes
+      run: |
+        echo "Current working tree status:"
+        git status --porcelain
+        echo "Files modified:"
+        git diff --name-only
+
     - name: Check for changes
       id: changes
       run: |
