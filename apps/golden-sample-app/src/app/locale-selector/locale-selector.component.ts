@@ -43,21 +43,12 @@ export class LocaleSelectorComponent implements OnInit {
       }
       
       if (typeof value === 'object') {
-        // Handle object values
-        if ('code' in value && typeof value.code === 'string') {
-          // It's a Locale object
-          const locale = value as Locale;
-          console.log('Setting language to Locale object:', locale);
-          if (this.currentLanguage?.code !== locale.code) {
-            this.currentLanguage = locale;
-            this.localeService.setLocale(locale.code);
-          }
-        } else if ('value' in value) {
-          // It's a dropdown selection object
+        // Handle dropdown menu selection which comes as {value: Locale}
+        if ('value' in value) {
           const dropdownValue = (value as any).value;
           console.log('Dropdown value:', dropdownValue);
           
-          if (typeof dropdownValue === 'object' && 'code' in dropdownValue && typeof dropdownValue.code === 'string') {
+          if (typeof dropdownValue === 'object' && 'code' in dropdownValue) {
             // It's a dropdown selection with a Locale value
             const locale = dropdownValue as Locale;
             console.log('Setting language from dropdown selection object:', locale);
@@ -75,6 +66,16 @@ export class LocaleSelectorComponent implements OnInit {
                 this.localeService.setLocale(foundLocale.code);
               }
             }
+          }
+        } 
+        // Handle direct Locale object
+        else if ('code' in value && typeof value.code === 'string') {
+          // It's a Locale object
+          const locale = value as Locale;
+          console.log('Setting language to Locale object:', locale);
+          if (this.currentLanguage?.code !== locale.code) {
+            this.currentLanguage = locale;
+            this.localeService.setLocale(locale.code);
           }
         } else {
           console.log('Unrecognized object format:', value);
@@ -106,6 +107,7 @@ export class LocaleSelectorComponent implements OnInit {
       
       if (this.localesCatalog.length === 0) {
         console.error('No valid locales found in the catalog');
+        return; // Exit early if no locales are available
       }
       
       console.log('Available locales:', this.localesCatalog);
@@ -120,32 +122,16 @@ export class LocaleSelectorComponent implements OnInit {
       console.log('Current language object:', this.currentLanguage);
       
       // Initialize the language if not set
-      if (!this.currentLanguage && this.localesCatalog.length > 0) {
+      if (!this.currentLanguage) {
         this.currentLanguage = this.localesCatalog[0];
         console.log('Setting default language:', this.currentLanguage);
         
-        // Apply the default language
-        this.localeService.setLocale(this.currentLanguage.code);
-      }
-      
-      // Ensure the component always has a valid language selected
-      if (!this.currentLanguage && this.localesCatalog.length > 0) {
-        this.currentLanguage = this.localesCatalog[0];
-        console.log('Fallback to first available language:', this.currentLanguage);
-      }
-      
-      // Add a small delay to ensure the DOM is ready before checking if we need to update the UI
-      setTimeout(() => {
-        // Double-check that the current language matches the service's locale
-        const serviceLocale = this.localeService.currentLocale;
-        if (this.currentLanguage?.code !== serviceLocale) {
-          console.log(`Component language (${this.currentLanguage?.code}) doesn't match service locale (${serviceLocale}), updating...`);
-          const serviceLocaleObj = this.findLocale(serviceLocale);
-          if (serviceLocaleObj) {
-            this.currentLanguage = serviceLocaleObj;
-          }
+        // Apply the default language if it's different from the current locale
+        if (this.currentLanguage.code !== currentLocale) {
+          console.log('Applying default language as current locale is different');
+          this.localeService.setLocale(this.currentLanguage.code);
         }
-      }, 100);
+      }
     } catch (error) {
       console.error('Error initializing locale selector:', error);
       // Fallback to first locale if available

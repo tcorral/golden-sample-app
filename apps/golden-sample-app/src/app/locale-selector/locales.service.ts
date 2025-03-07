@@ -31,45 +31,54 @@ export class LocalesService implements OnInit {
   }
 
   private initLocaleFromCookie(): void {
-    const cookieLocale = this.getCookieValue(COOKIE_NAME);
-    console.log(`Cookie locale: ${cookieLocale}`);
-    
-    // Only proceed if we have a valid cookie locale that's in our available locales
-    if (cookieLocale && this.availableLocales.includes(cookieLocale)) {
-      console.log(`Applying cookie locale: ${cookieLocale}`);
-      this._currentLocale = cookieLocale;
+    try {
+      const cookieLocale = this.getCookieValue(COOKIE_NAME);
+      console.log(`Cookie locale: ${cookieLocale}`);
       
-      // Check if the URL needs to be updated to match the cookie locale
-      const currentPath = this.document.location.pathname;
-      const baseHref = this.location.getBaseHref();
-      
-      // Check if the current URL contains any of the available locales
-      let hasLocaleInPath = false;
-      let currentPathLocale = '';
-      
-      for (const availableLocale of this.availableLocales) {
-        const localePattern = new RegExp(`^${baseHref}/${availableLocale}(/|$)`);
-        if (localePattern.test(currentPath)) {
-          hasLocaleInPath = true;
-          currentPathLocale = availableLocale;
-          break;
+      // Only proceed if we have a valid cookie locale that's in our available locales
+      if (cookieLocale && this.availableLocales.includes(cookieLocale)) {
+        console.log(`Applying cookie locale: ${cookieLocale}`);
+        this._currentLocale = cookieLocale;
+        
+        // Check if the URL needs to be updated to match the cookie locale
+        const currentPath = this.document.location.pathname;
+        const baseHref = this.location.getBaseHref();
+        
+        // Escape special characters in baseHref for regex
+        const escapedBaseHref = baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Check if the current URL contains any of the available locales
+        let hasLocaleInPath = false;
+        let currentPathLocale = '';
+        
+        for (const availableLocale of this.availableLocales) {
+          const localePattern = new RegExp(`^${escapedBaseHref}/${availableLocale}(/|$)`);
+          if (localePattern.test(currentPath)) {
+            hasLocaleInPath = true;
+            currentPathLocale = availableLocale;
+            break;
+          }
         }
+        
+        // If URL has a different locale than the cookie, update it
+        if (hasLocaleInPath && currentPathLocale !== cookieLocale) {
+          console.log(`URL has locale ${currentPathLocale} but cookie has ${cookieLocale}, redirecting...`);
+          this.setLocale(cookieLocale);
+        }
+        
+        // If no locale in path, add the cookie locale
+        if (!hasLocaleInPath) {
+          console.log(`URL doesn't have any locale, adding ${cookieLocale}...`);
+          this.setLocale(cookieLocale);
+        }
+      } else {
+        // If no valid cookie locale, use the default locale from LOCALE_ID
+        console.log(`No valid cookie locale, using default: ${this.locale}`);
+        this._currentLocale = this.locale;
       }
-      
-      // If URL has a different locale than the cookie, update it
-      if (hasLocaleInPath && currentPathLocale !== cookieLocale) {
-        console.log(`URL has locale ${currentPathLocale} but cookie has ${cookieLocale}, redirecting...`);
-        this.setLocale(cookieLocale);
-      }
-      
-      // If no locale in path, add the cookie locale
-      if (!hasLocaleInPath) {
-        console.log(`URL doesn't have any locale, adding ${cookieLocale}...`);
-        this.setLocale(cookieLocale);
-      }
-    } else {
-      // If no valid cookie locale, use the default locale from LOCALE_ID
-      console.log(`No valid cookie locale, using default: ${this.locale}`);
+    } catch (error) {
+      console.error('Error initializing locale from cookie:', error);
+      // Fallback to default locale
       this._currentLocale = this.locale;
     }
   }
@@ -102,6 +111,12 @@ export class LocalesService implements OnInit {
     const currentLocale = this._currentLocale;
     console.log(`Setting locale from ${currentLocale} to ${locale}`);
 
+    // Don't proceed if the locale is already set to the requested one
+    if (locale === currentLocale) {
+      console.log(`Locale is already set to ${locale}, no action needed`);
+      return;
+    }
+
     // Update internal state
     this._currentLocale = locale;
 
@@ -123,7 +138,6 @@ export class LocalesService implements OnInit {
     );
     console.log(`Set cookie: ${cookieValue}`);
 
-    // Always redirect to apply the locale change
     // Force reload with the new locale
     const currentPath = this.document.location.pathname;
     console.log(`Current path: ${currentPath}`);
@@ -138,8 +152,10 @@ export class LocalesService implements OnInit {
     // First check if the path already contains the target locale
     const targetLocalePattern = new RegExp(`^${escapedBaseHref}/${locale}(/|$)`);
     if (targetLocalePattern.test(currentPath)) {
-      console.log(`Path already contains the target locale ${locale}, no need to change URL`);
-      return; // No need to redirect if we're already on the correct locale
+      console.log(`Path already contains the target locale ${locale}, refreshing page`);
+      // Even if the URL has the correct locale, we need to refresh to apply the locale change
+      this.document.location.reload();
+      return;
     }
     
     for (const availableLocale of this.availableLocales) {
