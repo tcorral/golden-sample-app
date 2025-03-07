@@ -60,8 +60,10 @@ jobs:
             exit 1
           fi
 
+          cat issue_instructions.md > aider_message.txt
+          
           # Run Aider with Anthropic API settings
-          aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt --model $AIDER_MODEL --api-key "anthropic=${ANTHROPIC_API_KEY}"
+          aider --no-git --no-check-update --no-show-release-notes --yes-always --no-show-model-warnings --message-file aider_message.txt --model $AIDER_MODEL --api-key "anthropic=${ANTHROPIC_API_KEY}"
       
       - name: Check for changes
         id: check_changes
