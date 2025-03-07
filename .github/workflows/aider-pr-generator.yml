@@ -58,8 +58,36 @@ jobs:
         # Create prompt
         ACCEPTANCE=$(echo "$ACCEPTANCE" | sed 's/^[*-] *//g' | tr '\n' ' ' | sed 's/  \+/ /g')
         
-        PROMPT="Issue Title: ${{ github.event.issue.title }}\n\nDescription:\n$DESCRIPTION\n\nImplementation Requirements:\n- $ACCEPTANCE\n\nImportant Notes:\n- Implement all changes in a single pass\n- Ensure full test coverage\n- Maintain existing code style\n- Verify cookie handling works cross-browser"
-        echo -e "$PROMPT" > prompt.txt
+        # Format prompt with clear instructions
+        PROMPT="Issue: ${{ github.event.issue.title }}
+
+        **Problem Statement**
+        ${DESCRIPTION}
+
+        **Required Implementation**
+        1. Update the locale selector component to properly handle language selection
+        2. Implement cookie management for bb-locale
+        3. Ensure UI updates reflect selected language
+        4. Add page reload after locale change
+        5. Verify cross-browser compatibility
+
+        **Specific Technical Requirements**
+        - Use Angular's Location service for URL handling
+        - Implement CookieService for bb-locale management
+        - Add click handlers for language options
+        - Update component template to show current locale
+        - Add error handling for cookie operations
+
+        **Files to Modify**
+        ${FILES}
+
+        **Acceptance Criteria Validation**
+        - Test all language transitions
+        - Verify cookie persistence
+        - Check console for errors
+        - Confirm UI updates without full reload"
+
+        echo "$PROMPT" > prompt.txt
 
         echo "$FILES" > files.txt
 
@@ -72,7 +100,7 @@ jobs:
         echo "$FILES"
         echo "Final prompt content:"
         cat prompt.txt
-        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES --message "Implement all requirements in a single comprehensive solution."
+        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES --message "Implement the technical requirements exactly as outlined in the prompt"
 
     - name: Check for changes
       id: changes
