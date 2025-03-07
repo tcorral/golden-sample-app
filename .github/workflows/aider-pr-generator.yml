@@ -154,10 +154,10 @@ jobs:
           with open('aider_prompt.txt', 'r') as f:
               prompt = f.read()
           
-          # Get OpenAI API key from environment
-          openai_api_key = os.environ.get('OPENAI_API_KEY')
-          if not openai_api_key:
-              print("Error: OPENAI_API_KEY environment variable not set")
+          # Get Anthropic API key from environment
+          anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
+          if not anthropic_api_key:
+              print("Error: ANTHROPIC_API_KEY environment variable not set")
               sys.exit(1)
           
           # Prepare Aider command
