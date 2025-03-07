@@ -30,14 +30,15 @@ export class LocalesService implements OnInit {
     this.initLocaleFromCookie();
   }
 
+  /**
+   * Initializes the locale from the cookie and updates URL if needed
+   */
   private initLocaleFromCookie(): void {
     try {
       const cookieLocale = this.getCookieValue(COOKIE_NAME);
-      console.log(`Cookie locale: ${cookieLocale}`);
       
       // Only proceed if we have a valid cookie locale that's in our available locales
       if (cookieLocale && this.availableLocales.includes(cookieLocale)) {
-        console.log(`Applying cookie locale: ${cookieLocale}`);
         this._currentLocale = cookieLocale;
         
         // Check if the URL needs to be updated to match the cookie locale
@@ -62,18 +63,15 @@ export class LocalesService implements OnInit {
         
         // If URL has a different locale than the cookie, update it
         if (hasLocaleInPath && currentPathLocale !== cookieLocale) {
-          console.log(`URL has locale ${currentPathLocale} but cookie has ${cookieLocale}, redirecting...`);
           this.setLocale(cookieLocale);
         }
         
         // If no locale in path, add the cookie locale
         if (!hasLocaleInPath) {
-          console.log(`URL doesn't have any locale, adding ${cookieLocale}...`);
           this.setLocale(cookieLocale);
         }
       } else {
         // If no valid cookie locale, use the default locale from LOCALE_ID
-        console.log(`No valid cookie locale, using default: ${this.locale}`);
         this._currentLocale = this.locale;
       }
     } catch (error) {
@@ -83,9 +81,13 @@ export class LocalesService implements OnInit {
     }
   }
 
+  /**
+   * Gets a cookie value by name
+   * @param name The name of the cookie to retrieve
+   * @returns The cookie value or null if not found
+   */
   private getCookieValue(name: string): string | null {
     const cookies = this.document.cookie.split(';');
-    console.log('All cookies:', this.document.cookie);
     
     for (const cookie of cookies) {
       if (!cookie.trim()) continue;
@@ -94,26 +96,23 @@ export class LocalesService implements OnInit {
       const cookieName = parts[0].trim();
       const cookieValue = parts.length > 1 ? parts[1].trim() : '';
       
-      console.log(`Checking cookie: ${cookieName} = ${cookieValue}`);
-      
       if (cookieName === name || cookieName === encodeURIComponent(name)) {
-        const decodedValue = decodeURIComponent(cookieValue);
-        console.log(`Found cookie ${name} with value ${decodedValue}`);
-        return decodedValue;
+        return decodeURIComponent(cookieValue);
       }
     }
     
-    console.log(`Cookie ${name} not found`);
     return null;
   }
 
-  setLocale(locale: string) {
+  /**
+   * Sets the application locale and updates the URL
+   * @param locale The locale code to set
+   */
+  setLocale(locale: string): void {
     const currentLocale = this._currentLocale;
-    console.log(`Setting locale from ${currentLocale} to ${locale}`);
 
     // Don't proceed if the locale is already set to the requested one
     if (locale === currentLocale) {
-      console.log(`Locale is already set to ${locale}, no action needed`);
       return;
     }
 
@@ -122,10 +121,20 @@ export class LocalesService implements OnInit {
 
     // Get base href
     const baseHref = this.location.getBaseHref();
-    console.log(`Base href: ${baseHref}`);
 
     // Set the cookie with the new locale
-    // Make sure the cookie is set with the correct domain and path
+    this.setCookie(locale, baseHref);
+
+    // Update the URL with the new locale
+    this.updateUrlWithLocale(locale, baseHref);
+  }
+
+  /**
+   * Sets the locale cookie
+   * @param locale The locale to set in the cookie
+   * @param baseHref The base href for the cookie path
+   */
+  private setCookie(locale: string, baseHref: string): void {
     const cookieValue = `${COOKIE_NAME}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
     
@@ -136,15 +145,15 @@ export class LocalesService implements OnInit {
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
-    console.log(`Set cookie: ${cookieValue}`);
+  }
 
-    // Force reload with the new locale
+  /**
+   * Updates the URL with the new locale
+   * @param locale The locale to set in the URL
+   * @param baseHref The base href for the URL
+   */
+  private updateUrlWithLocale(locale: string, baseHref: string): void {
     const currentPath = this.document.location.pathname;
-    console.log(`Current path: ${currentPath}`);
-    
-    // Check if the current path already has a locale
-    let localeFound = false;
-    let newPath = currentPath;
     
     // Escape special characters in baseHref for regex
     const escapedBaseHref = baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -152,11 +161,14 @@ export class LocalesService implements OnInit {
     // First check if the path already contains the target locale
     const targetLocalePattern = new RegExp(`^${escapedBaseHref}/${locale}(/|$)`);
     if (targetLocalePattern.test(currentPath)) {
-      console.log(`Path already contains the target locale ${locale}, refreshing page`);
       // Even if the URL has the correct locale, we need to refresh to apply the locale change
       this.document.location.reload();
       return;
     }
+    
+    // Check if the current path already has a locale
+    let localeFound = false;
+    let newPath = currentPath;
     
     for (const availableLocale of this.availableLocales) {
       // Create a pattern that matches the locale at the beginning of the path or after baseHref
@@ -164,38 +176,46 @@ export class LocalesService implements OnInit {
       if (localePattern.test(currentPath)) {
         // Replace existing locale in the path
         newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
-        console.log(`Replacing locale ${availableLocale} with ${locale} in path: ${newPath}`);
         localeFound = true;
         break;
       }
     }
     
     if (!localeFound) {
-      // No locale in path, add the new locale
-      if (currentPath === baseHref || currentPath === `${baseHref}/`) {
-        // If we're at the root path, simply append the locale
-        newPath = `${baseHref}/${locale}/`;
-      } else {
-        // Otherwise, insert the locale after the base href
-        const pathAfterBaseHref = currentPath.startsWith(baseHref) 
-          ? currentPath.substring(baseHref.length) 
-          : currentPath;
-        
-        // Ensure path starts with a slash if needed
-        const normalizedPath = pathAfterBaseHref.startsWith('/') 
-          ? pathAfterBaseHref 
-          : `/${pathAfterBaseHref}`;
-        
-        newPath = `${baseHref}/${locale}${normalizedPath}`;
-      }
-      console.log(`Adding locale to path: ${newPath}`);
+      newPath = this.constructPathWithLocale(locale, baseHref, currentPath);
     }
     
     // Preserve query parameters and hash
     const queryAndHash = this.document.location.search + this.document.location.hash;
     const finalUrl = newPath + queryAndHash;
-    console.log(`Redirecting to: ${finalUrl}`);
     this.document.location.href = finalUrl;
+  }
+
+  /**
+   * Constructs a new path with the locale added
+   * @param locale The locale to add to the path
+   * @param baseHref The base href for the URL
+   * @param currentPath The current path
+   * @returns The new path with the locale added
+   */
+  private constructPathWithLocale(locale: string, baseHref: string, currentPath: string): string {
+    // No locale in path, add the new locale
+    if (currentPath === baseHref || currentPath === `${baseHref}/`) {
+      // If we're at the root path, simply append the locale
+      return `${baseHref}/${locale}/`;
+    } else {
+      // Otherwise, insert the locale after the base href
+      const pathAfterBaseHref = currentPath.startsWith(baseHref) 
+        ? currentPath.substring(baseHref.length) 
+        : currentPath;
+      
+      // Ensure path starts with a slash if needed
+      const normalizedPath = pathAfterBaseHref.startsWith('/') 
+        ? pathAfterBaseHref 
+        : `/${pathAfterBaseHref}`;
+      
+      return `${baseHref}/${locale}${normalizedPath}`;
+    }
   }
 
   get currentLocale() {

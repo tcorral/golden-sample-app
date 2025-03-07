@@ -17,72 +17,71 @@ export class LocaleSelectorComponent implements OnInit {
     @Inject(LOCALES_LIST) public locales: string[]
   ) {}
 
+  /**
+   * Sets the language based on the selected value from the dropdown
+   * @param value The selected language value
+   */
   set language(value: string | object | Locale | undefined) {
-    console.log('Language setter called with:', value);
-    
     if (!value) {
-      console.log('No value provided to language setter');
       return;
     }
     
     try {
       // Handle different value types
       if (typeof value === 'string') {
-        // Handle string values
-        const foundLocale = this.findLocale(value);
-        if (foundLocale) {
-          console.log('Found locale for string value:', foundLocale);
-          if (this.currentLanguage?.code !== foundLocale.code) {
-            this.currentLanguage = foundLocale;
-            this.localeService.setLocale(foundLocale.code);
-          }
-        } else {
-          console.log('Could not find locale for string value:', value);
-        }
+        this.handleStringValue(value);
         return;
       }
       
       if (typeof value === 'object') {
-        // Handle dropdown menu selection which comes as {value: Locale}
-        if ('value' in value) {
-          const dropdownValue = (value as any).value;
-          console.log('Dropdown value:', dropdownValue);
-          
-          if (typeof dropdownValue === 'object' && 'code' in dropdownValue) {
-            // It's a dropdown selection with a Locale value
-            const locale = dropdownValue as Locale;
-            console.log('Setting language from dropdown selection object:', locale);
-            if (this.currentLanguage?.code !== locale.code) {
-              this.currentLanguage = locale;
-              this.localeService.setLocale(locale.code);
-            }
-          } else if (typeof dropdownValue === 'string') {
-            // It's a dropdown selection with a string value
-            const foundLocale = this.findLocale(dropdownValue);
-            if (foundLocale) {
-              console.log('Setting language from dropdown string value:', foundLocale);
-              if (this.currentLanguage?.code !== foundLocale.code) {
-                this.currentLanguage = foundLocale;
-                this.localeService.setLocale(foundLocale.code);
-              }
-            }
-          }
-        } 
-        // Handle direct Locale object
-        else if ('code' in value && typeof value.code === 'string') {
-          // It's a Locale object
-          const locale = value as Locale;
-          console.log('Setting language to Locale object:', locale);
-          if (this.currentLanguage?.code !== locale.code) {
-            this.currentLanguage = locale;
-            this.localeService.setLocale(locale.code);
-          }
-        } else {
-          console.log('Unrecognized object format:', value);
-        }
+        this.handleObjectValue(value);
       }
     } catch (error) {
       console.error('Error processing language selection:', error);
+    }
+  }
+
+  /**
+   * Handles string values for language selection
+   * @param value The string value to process
+   */
+  private handleStringValue(value: string): void {
+    const foundLocale = this.findLocale(value);
+    if (foundLocale && this.currentLanguage?.code !== foundLocale.code) {
+      this.currentLanguage = foundLocale;
+      this.localeService.setLocale(foundLocale.code);
+    }
+  }
+
+  /**
+   * Handles object values for language selection
+   * @param value The object value to process
+   */
+  private handleObjectValue(value: object): void {
+    // Handle dropdown menu selection which comes as {value: Locale}
+    if ('value' in value) {
+      const dropdownValue = (value as any).value;
+      
+      if (typeof dropdownValue === 'object' && 'code' in dropdownValue) {
+        // It's a dropdown selection with a Locale value
+        const locale = dropdownValue as Locale;
+        if (this.currentLanguage?.code !== locale.code) {
+          this.currentLanguage = locale;
+          this.localeService.setLocale(locale.code);
+        }
+      } else if (typeof dropdownValue === 'string') {
+        // It's a dropdown selection with a string value
+        this.handleStringValue(dropdownValue);
+      }
+    } 
+    // Handle direct Locale object
+    else if ('code' in value && typeof (value as any).code === 'string') {
+      // It's a Locale object
+      const locale = value as Locale;
+      if (this.currentLanguage?.code !== locale.code) {
+        this.currentLanguage = locale;
+        this.localeService.setLocale(locale.code);
+      }
     }
   }
 
@@ -142,6 +141,11 @@ export class LocaleSelectorComponent implements OnInit {
     }
   }
 
+  /**
+   * Finds a locale object by its code or name
+   * @param locale The locale code or name to find
+   * @returns The matching Locale object or undefined if not found
+   */
   private findLocale(locale: string): Locale | undefined {
     // First try direct match
     if (this.locales.includes(locale) && localesCatalog[locale]) {
