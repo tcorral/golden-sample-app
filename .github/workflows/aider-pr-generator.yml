@@ -70,7 +70,9 @@ jobs:
         FILES=$(cat files.txt)
         echo "Processing files:"
         echo "$FILES"
-        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES
+        echo "Final prompt content:"
+        cat prompt.txt
+        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES --message "Implement all requirements in a single comprehensive solution
 
     - name: Check for changes
       id: changes
