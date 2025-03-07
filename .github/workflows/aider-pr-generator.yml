@@ -58,13 +58,24 @@ jobs:
           echo "Creating message file for Aider"
           cat issue_instructions.md > aider_message.txt
           
-          # Run Aider with appropriate options
+          # Create Aider configuration file to disable interactive features
+          cat > aider_config.yml << EOL
+          no-check-update: true
+          no-show-release-notes: true
+          yes-always: true
+          no-browser: true
+          no-fancy-input: true
+          no-suggestions: true
+          no-analytics: true
+          EOL
+          
+          # Run Aider with appropriate options - in non-interactive mode
           if [ -n "$FILES" ]; then
             echo "Focusing on specific files: $FILES"
-            aider --no-git --message-file aider_message.txt $FILES
+            aider --no-git -c aider_config.yml --message-file aider_message.txt $FILES
           else
             echo "No specific files mentioned, scanning entire repository"
-            aider --no-git --message-file aider_message.txt
+            aider --no-git -c aider_config.yml --message-file aider_message.txt
           fi
       
       - name: Check for changes
