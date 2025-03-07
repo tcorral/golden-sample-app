@@ -74,6 +74,7 @@ jobs:
         BRANCH_NAME="aider-fix-${{ github.event.issue.number }}"
         echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
         git checkout -b $BRANCH_NAME
+        git status
         git commit -m "Fix: ${{ github.event.issue.title }} (issue #${{ github.event.issue.number }})"
 
     - name: Push changes
