@@ -148,11 +148,15 @@ jobs:
                       'branch': branch_name
                   }, f)
               
-              print(f'::set-output name=changes_made::true')
-              print(f'::set-output name=branch_name::{branch_name}')
+              # Use GitHub environment file instead of set-output
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('changes_made=true\\n')
+                  f.write(f'branch_name={branch_name}\\n')
           else:
               print('No changes were made by Aider')
-              print(f'::set-output name=changes_made::false')
+              # Use GitHub environment file instead of set-output
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('changes_made=false\\n')
           "
 
       - name: Create Pull Request
