@@ -138,7 +138,7 @@ jobs:
         id: run-aider-files
         if: steps.parse-issue.outputs.has_files == 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Create a script to run Aider with the specified files
           cat > run_aider.py << 'EOF'
@@ -232,7 +232,7 @@ jobs:
         id: run-aider-repo
         if: steps.parse-issue.outputs.has_files == 'false'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           # Create a script to run Aider on the whole repository
           cat > run_aider_repo.py << 'EOF'
