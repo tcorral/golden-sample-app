@@ -39,7 +39,8 @@ jobs:
         ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /## |^$/{flag=0} flag')
 
         if [ -z "$FILES" ]; then
-          FILES=$(git ls-files | tr '\n' ' ')
+          # Get all files in repo (excluding directories)
+          FILES=$(git ls-files -z | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
         fi
 
         PROMPT="Issue Title: ${{ github.event.issue.title }}\n\nDescription:\n$DESCRIPTION\n\nAcceptance Criteria:\n$ACCEPTANCE"
@@ -51,7 +52,8 @@ jobs:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
         FILES=$(cat files.txt)
-        cat prompt.txt | aider --yes $FILES
+        echo "Files to process: $FILES"
+        cat prompt.txt | aider --yes --model claude-3-opus $FILES
 
     - name: Check for changes
       id: changes
