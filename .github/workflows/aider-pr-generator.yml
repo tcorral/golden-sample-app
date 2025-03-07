@@ -58,7 +58,7 @@ jobs:
 
       - name: Run Aider
         env:
-          AIDER_API_KEY: ${{ secrets.AIDER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # Use Anthropics Sonnet 3.7 by default (the alias "sonnet" per aider's docs)
           AIDER_MODEL: ${{ secrets.AIDER_MODEL || 'sonnet' }}
         run: |
