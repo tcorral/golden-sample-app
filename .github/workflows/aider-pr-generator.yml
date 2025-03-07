@@ -14,7 +14,7 @@ jobs:
 
       - name: Install Aider CLI
         run: |
-          # Download the latest Aider CLI binary for Linux from the official repository.
+          # Download the latest Aider CLI binary for Linux from its GitHub releases.
           curl -L https://github.com/aider-ai/aider/releases/latest/download/aider-linux-amd64 -o aider
           chmod +x aider
           sudo mv aider /usr/local/bin/
@@ -30,10 +30,9 @@ jobs:
           DESCRIPTION=$(echo "$ISSUE_BODY" | awk '/## Description/{flag=1; next} /^## /{if(flag){flag=0}} flag')
           # Extract "Files to modify": text between "## Files to modify" and the next markdown header.
           FILES=$(echo "$ISSUE_BODY" | awk '/## Files to modify/{flag=1; next} /^## /{if(flag){flag=0}} flag')
-          # Extract "Acceptance criteria": text from "## Acceptance criteria" until the end.
+          # Extract "Acceptance criteria": text from "## Acceptance criteria" to the end.
           ACCEPTANCE=$(echo "$ISSUE_BODY" | awk '/## Acceptance criteria/{flag=1; next} flag')
 
-          # Set outputs for later steps.
           echo "ISSUE_TITLE<<EOF" >> $GITHUB_OUTPUT
           echo "$ISSUE_TITLE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -59,7 +58,9 @@ jobs:
 
       - name: Run Aider
         env:
-          AIDER_API_KEY: ${{ secrets.AIDER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Set the model to use Anthropics Sonnet 3.7. You can override by setting the AIDER_MODEL secret.
+          MODEL: anthropic/claude-3-7-sonnet-20250219
         run: |
           # Build the prompt from the issue content.
           PROMPT="Issue Title: ${{ steps.parse_issue.outputs.ISSUE_TITLE }}
@@ -73,14 +74,14 @@ jobs:
           echo "Using prompt:"
           echo "$PROMPT"
 
-          # If a list of files is provided, pass them to Aider; otherwise, analyze the entire repository.
+          # If "Files to modify" is provided, pass them to aider; otherwise, let aider analyze the entire repository.
           if [ -n "${{ steps.parse_issue.outputs.FILES }}" ]; then
             FILES_TO_MODIFY="${{ steps.parse_issue.outputs.FILES }}"
             echo "Files to modify provided: $FILES_TO_MODIFY"
-            aider --prompt "$PROMPT" --files "$FILES_TO_MODIFY"
+            aider --model "$MODEL" --prompt "$PROMPT" --files "$FILES_TO_MODIFY"
           else
             echo "No files provided; analyzing entire repository."
-            aider --prompt "$PROMPT"
+            aider --model "$MODEL" --prompt "$PROMPT"
           fi
 
       - name: Commit changes
@@ -99,6 +100,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Aider AI Changes for Issue #${{ github.event.issue.number }}"
-          body: "This PR applies the changes suggested by Aider AI for issue #${{ github.event.issue.number }}."
+          body: "This PR applies the changes suggested by Aider AI for issue #${{ github.event.issue.number }} using Anthropics Sonnet 3.7."
           head: ${{ env.branch }}
           base: main
