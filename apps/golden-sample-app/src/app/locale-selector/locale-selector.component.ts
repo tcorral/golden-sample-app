@@ -38,16 +38,33 @@ export class LocaleSelectorComponent implements OnInit {
   }
 
   ngOnInit() {
+    // Build the locale catalog from available locales
     this.localesCatalog = this.locales.reduce(
-      (acc: Locale[], locale) => [...acc, localesCatalog[locale]],
+      (acc: Locale[], locale) => {
+        if (localesCatalog[locale]) {
+          return [...acc, localesCatalog[locale]];
+        }
+        return acc;
+      },
       []
     );
+    
+    console.log('Available locales:', this.localesCatalog);
 
-    this.currentLanguage = this.findLocale(this.localeService.currentLocale);
+    // Get the current locale from the service
+    const currentLocale = this.localeService.currentLocale;
+    console.log('Current locale from service:', currentLocale);
+    
+    // Find the locale object for the current locale
+    this.currentLanguage = this.findLocale(currentLocale);
+    console.log('Current language object:', this.currentLanguage);
     
     // Initialize the language if not set
     if (!this.currentLanguage && this.localesCatalog.length > 0) {
       this.currentLanguage = this.localesCatalog[0];
+      console.log('Setting default language:', this.currentLanguage);
+      // Apply the default language
+      this.localeService.setLocale(this.currentLanguage.code);
     }
   }
 
