@@ -84,7 +84,7 @@ jobs:
       
       - name: Run Aider with files
         id: run-aider
-        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify) != [] }}
+        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify).length > 0 }}
         run: |
           # Get the files list from output
           FILES=$(echo '${{ steps.parse-issue.outputs.files-to-modify }}' | jq -r '.[]')
@@ -95,7 +95,7 @@ jobs:
       
       - name: Run Aider on whole repository
         id: run-aider-whole-repo
-        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify) == [] }}
+        if: ${{ fromJSON(steps.parse-issue.outputs.files-to-modify) == '[]' }}
         run: |
           # Run aider on the whole repository
           echo "Running Aider on the whole repository"
