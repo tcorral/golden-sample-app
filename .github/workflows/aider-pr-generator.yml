@@ -50,6 +50,8 @@ jobs:
       - name: Run Aider to implement requested changes
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AIDER_AUTO_CONFIRM: "true"
+          PYTHONIOENCODING: "utf-8"
         run: |
           # Extract file paths if they're included in the issue body (optional)
           FILES=$(grep -i "^files to modify:" issue_instructions.md -A 10 | grep -v "^files to modify:" | grep -v "^$" | sed 's/^- //' | tr '\n' ' ' || echo "")
@@ -58,24 +60,13 @@ jobs:
           echo "Creating message file for Aider"
           cat issue_instructions.md > aider_message.txt
           
-          # Create Aider configuration file to disable interactive features
-          cat > aider_config.yml << EOL
-          no-check-update: true
-          no-show-release-notes: true
-          yes-always: true
-          no-browser: true
-          no-fancy-input: true
-          no-suggestions: true
-          no-analytics: true
-          EOL
-          
-          # Run Aider with appropriate options - in non-interactive mode
+          # Run Aider with appropriate options - using only available flags
           if [ -n "$FILES" ]; then
             echo "Focusing on specific files: $FILES"
-            aider --no-git -c aider_config.yml --message-file aider_message.txt $FILES
+            aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt $FILES
           else
             echo "No specific files mentioned, scanning entire repository"
-            aider --no-git -c aider_config.yml --message-file aider_message.txt
+            aider --no-git --no-check-update --no-show-release-notes --yes-always --message-file aider_message.txt
           fi
       
       - name: Check for changes
