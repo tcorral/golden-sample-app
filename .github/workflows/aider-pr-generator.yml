@@ -52,7 +52,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AIDER_AUTO_CONFIRM: "true"
           PYTHONIOENCODING: "utf-8"
-          AIDER_MODEL: "claude-3"  # You can choose from available models like claude-1, claude-2, or claude-3
+          AIDER_MODEL: "claude-3-7-sonnet-20250219"  # You can choose from available models like claude-1, claude-2, or claude-3
         run: |
           # Ensure the Anthropic API key is set
           if [[ -z "$ANTHROPIC_API_KEY" ]]; then
@@ -61,7 +61,7 @@ jobs:
           fi
 
           cat issue_instructions.md > aider_message.txt
-          
+
           # Run Aider with Anthropic API settings
           aider --no-git --no-check-update --no-show-release-notes --yes-always --no-show-model-warnings --message-file aider_message.txt --model $AIDER_MODEL --api-key "anthropic=${ANTHROPIC_API_KEY}"
       
