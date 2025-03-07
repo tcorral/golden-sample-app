@@ -1,0 +1,23 @@
+
+# Task: [AIDER] Locale Selector Component Doesn't Change Language in Angular NX Monorepo
+
+## Description
+**Problem**
+The app-locale-selector component is supposed to update the application's locale when a language is selected, but it does not work. Clicking a language in the dropdown does nothing—the UI does not update, and the selected locale is not applied.
+
+**Current Behavior**
+* The dropdown displays available languages.
+* Clicking a language does not update the app’s locale.
+* No errors appear in the console.
+* The locale stored in bb-locale does not seem to take effect.
+
+## Acceptance Criteria
+**Expected Behavior**
+1. Clicking the locale selector should display the list of available languages.
+2. Selecting a language should:
+    * Set the locale in the bb-locale cookie.
+    * Update the UI to reflect the chosen language.
+    * Ensure the selected locale appears in the dropdown.
+3. The page should reload with the correct locale applied.
+
+Please implement the necessary changes to address this issue.
