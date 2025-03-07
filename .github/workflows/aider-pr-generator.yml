@@ -91,5 +91,5 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         title: "fix: Update locale selector functionality"
         body: "Automated fixes for issue #${{ github.event.issue.number }}\n\n${{ steps.extract-sections.outputs.description }}"
-        branch: $BRANCH_NAME
+        branch: ${{ env.BRANCH_NAME }}
         base: main
