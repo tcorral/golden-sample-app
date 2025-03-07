@@ -18,19 +18,25 @@ export class LocaleSelectorComponent implements OnInit {
   ) {}
 
   set language(value: string | object | Locale | undefined) {
+    console.log('Language setter called with:', value);
+    
     if (typeof value === 'string') {
       // Handle string values as well, which might come from the dropdown
       const foundLocale = this.findLocale(value as string);
       if (foundLocale) {
+        console.log('Found locale for string value:', foundLocale);
         this.currentLanguage = foundLocale;
         this.localeService.setLocale(foundLocale.code);
       }
       return;
     }
     
-    const locale = value as Locale;
-    this.currentLanguage = locale;
-    this.localeService.setLocale(locale.code);
+    if (value && typeof value === 'object') {
+      const locale = value as Locale;
+      console.log('Setting language to object:', locale);
+      this.currentLanguage = locale;
+      this.localeService.setLocale(locale.code);
+    }
   }
 
   get language(): Locale | undefined {
@@ -69,8 +75,25 @@ export class LocaleSelectorComponent implements OnInit {
   }
 
   private findLocale(locale: string): Locale | undefined {
-    if (this.locales.includes(locale)) {
+    // First try direct match
+    if (this.locales.includes(locale) && localesCatalog[locale]) {
       return localesCatalog[locale];
+    }
+    
+    // Try case-insensitive match
+    const lowerLocale = locale.toLowerCase();
+    for (const availableLocale of this.locales) {
+      if (availableLocale.toLowerCase() === lowerLocale && localesCatalog[availableLocale]) {
+        return localesCatalog[availableLocale];
+      }
+    }
+    
+    // Try to match by code
+    for (const availableLocale of this.locales) {
+      const catalogEntry = localesCatalog[availableLocale];
+      if (catalogEntry && catalogEntry.code === locale) {
+        return catalogEntry;
+      }
     }
 
     return undefined;

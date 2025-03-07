@@ -34,6 +34,7 @@ export class LocalesService implements OnInit {
     const cookieLocale = this.getCookieValue(COOKIE_NAME);
     console.log(`Cookie locale: ${cookieLocale}`);
     
+    // Only proceed if we have a valid cookie locale that's in our available locales
     if (cookieLocale && this.availableLocales.includes(cookieLocale)) {
       console.log(`Applying cookie locale: ${cookieLocale}`);
       this._currentLocale = cookieLocale;
@@ -44,17 +45,21 @@ export class LocalesService implements OnInit {
       
       // Check if the current URL contains any of the available locales
       let hasLocaleInPath = false;
+      let currentPathLocale = '';
+      
       for (const availableLocale of this.availableLocales) {
-        const localePattern = new RegExp(`^${baseHref}/${availableLocale}/`);
+        const localePattern = new RegExp(`^${baseHref}/${availableLocale}(/|$)`);
         if (localePattern.test(currentPath)) {
           hasLocaleInPath = true;
-          // If URL has a different locale than the cookie, update it
-          if (availableLocale !== cookieLocale) {
-            console.log(`URL has locale ${availableLocale} but cookie has ${cookieLocale}, redirecting...`);
-            this.setLocale(cookieLocale);
-          }
+          currentPathLocale = availableLocale;
           break;
         }
+      }
+      
+      // If URL has a different locale than the cookie, update it
+      if (hasLocaleInPath && currentPathLocale !== cookieLocale) {
+        console.log(`URL has locale ${currentPathLocale} but cookie has ${cookieLocale}, redirecting...`);
+        this.setLocale(cookieLocale);
       }
       
       // If no locale in path, add the cookie locale
@@ -62,6 +67,10 @@ export class LocalesService implements OnInit {
         console.log(`URL doesn't have any locale, adding ${cookieLocale}...`);
         this.setLocale(cookieLocale);
       }
+    } else {
+      // If no valid cookie locale, use the default locale from LOCALE_ID
+      console.log(`No valid cookie locale, using default: ${this.locale}`);
+      this._currentLocale = this.locale;
     }
   }
 
@@ -69,7 +78,7 @@ export class LocalesService implements OnInit {
     const cookies = this.document.cookie.split(';');
     for (const cookie of cookies) {
       const [cookieName, cookieValue] = cookie.trim().split('=');
-      if (cookieName === encodeURIComponent(name)) {
+      if (cookieName === name || cookieName === encodeURIComponent(name)) {
         return decodeURIComponent(cookieValue);
       }
     }
@@ -88,7 +97,7 @@ export class LocalesService implements OnInit {
     console.log(`Base href: ${baseHref}`);
 
     // Set the cookie with the new locale
-    const cookieValue = `${encodeURIComponent(COOKIE_NAME)}=${encodeURIComponent(locale)}`;
+    const cookieValue = `${COOKIE_NAME}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
 
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
