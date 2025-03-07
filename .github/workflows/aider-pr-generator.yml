@@ -78,18 +78,23 @@ jobs:
 
     - name: Push changes
       if: steps.changes.outputs.has_changes == 'true'
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: ${{ env.BRANCH_NAME }}
-        force: true  # Add force push capability
+      run: |
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git push origin $BRANCH_NAME --force-with-lease
+      env:
+        BRANCH_NAME: aider-fix-${{ github.event.issue.number }}
       
     - name: Create Pull Request
       if: steps.changes.outputs.has_changes == 'true'
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        title: "fix: Update locale selector functionality"
+        title: "fix: ${{ github.event.issue.title }}"
         body: "Automated fixes for issue #${{ github.event.issue.number }}\n\n${{ steps.extract-sections.outputs.description }}"
-        branch: ${{ env.BRANCH_NAME }}
+        branch: aider-fix-${{ github.event.issue.number }}
         base: main
+        delete-branch: false
+        commit-message: "Apply Aider fixes for issue #${{ github.event.issue.number }}"
+        author: "GitHub Actions <actions@github.com>"
+        committer: "GitHub Actions <actions@github.com>"
+        labels: automated, bug-fix
