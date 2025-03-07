@@ -97,9 +97,14 @@ export class LocalesService implements OnInit {
     console.log(`Base href: ${baseHref}`);
 
     // Set the cookie with the new locale
+    // Make sure the cookie is set with the correct domain and path
     const cookieValue = `${COOKIE_NAME}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
-
+    
+    // Clear any existing cookie first
+    this.document.cookie = `${COOKIE_NAME}=; ${cookiePath}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    
+    // Set the new cookie
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
@@ -114,8 +119,12 @@ export class LocalesService implements OnInit {
     let localeFound = false;
     let newPath = currentPath;
     
+    // Escape special characters in baseHref for regex
+    const escapedBaseHref = baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
     for (const availableLocale of this.availableLocales) {
-      const localePattern = new RegExp(`^${baseHref}/${availableLocale}(/|$)`);
+      // Create a pattern that matches the locale at the beginning of the path or after baseHref
+      const localePattern = new RegExp(`^${escapedBaseHref}/${availableLocale}(/|$)`);
       if (localePattern.test(currentPath)) {
         // Replace existing locale in the path
         newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);

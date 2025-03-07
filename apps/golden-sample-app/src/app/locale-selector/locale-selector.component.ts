@@ -39,21 +39,39 @@ export class LocaleSelectorComponent implements OnInit {
     }
     
     if (typeof value === 'object') {
-      // Handle both Locale objects and dropdown selection objects
-      if ('code' in value) {
-        // It's a Locale object
-        const locale = value as Locale;
-        console.log('Setting language to Locale object:', locale);
-        this.currentLanguage = locale;
-        this.localeService.setLocale(locale.code);
-      } else if ('value' in value && typeof (value as any).value === 'object' && 'code' in (value as any).value) {
-        // It's a dropdown selection with a Locale value
-        const locale = (value as any).value as Locale;
-        console.log('Setting language from dropdown selection:', locale);
-        this.currentLanguage = locale;
-        this.localeService.setLocale(locale.code);
-      } else {
-        console.log('Unrecognized object format:', value);
+      try {
+        // Handle different object formats that might come from the dropdown
+        if ('code' in value) {
+          // It's a Locale object
+          const locale = value as Locale;
+          console.log('Setting language to Locale object:', locale);
+          this.currentLanguage = locale;
+          this.localeService.setLocale(locale.code);
+        } else if ('value' in value) {
+          // It's a dropdown selection object
+          const dropdownValue = (value as any).value;
+          console.log('Dropdown value:', dropdownValue);
+          
+          if (typeof dropdownValue === 'object' && 'code' in dropdownValue) {
+            // It's a dropdown selection with a Locale value
+            const locale = dropdownValue as Locale;
+            console.log('Setting language from dropdown selection object:', locale);
+            this.currentLanguage = locale;
+            this.localeService.setLocale(locale.code);
+          } else if (typeof dropdownValue === 'string') {
+            // It's a dropdown selection with a string value
+            const foundLocale = this.findLocale(dropdownValue);
+            if (foundLocale) {
+              console.log('Setting language from dropdown string value:', foundLocale);
+              this.currentLanguage = foundLocale;
+              this.localeService.setLocale(foundLocale.code);
+            }
+          }
+        } else {
+          console.log('Unrecognized object format:', value);
+        }
+      } catch (error) {
+        console.error('Error processing language selection:', error);
       }
     }
   }
@@ -65,51 +83,55 @@ export class LocaleSelectorComponent implements OnInit {
   ngOnInit() {
     console.log('LocaleSelectorComponent initializing');
     
-    // Build the locale catalog from available locales
-    this.localesCatalog = this.locales.reduce(
-      (acc: Locale[], locale) => {
-        if (localesCatalog[locale]) {
-          return [...acc, localesCatalog[locale]];
-        }
-        return acc;
-      },
-      []
-    );
-    
-    console.log('Available locales:', this.localesCatalog);
-    console.log('Available locale codes:', this.locales);
-
-    // Get the current locale from the service
-    const currentLocale = this.localeService.currentLocale;
-    console.log('Current locale from service:', currentLocale);
-    
-    // Find the locale object for the current locale
-    this.currentLanguage = this.findLocale(currentLocale);
-    console.log('Current language object:', this.currentLanguage);
-    
-    // Initialize the language if not set
-    if (!this.currentLanguage && this.localesCatalog.length > 0) {
-      this.currentLanguage = this.localesCatalog[0];
-      console.log('Setting default language:', this.currentLanguage);
+    try {
+      // Build the locale catalog from available locales
+      this.localesCatalog = this.locales.reduce(
+        (acc: Locale[], locale) => {
+          if (localesCatalog[locale]) {
+            return [...acc, localesCatalog[locale]];
+          }
+          return acc;
+        },
+        []
+      );
       
-      // Apply the default language if it's different from the current locale
-      if (this.currentLanguage.code !== currentLocale) {
-        console.log('Applying default language as current locale is different');
+      if (this.localesCatalog.length === 0) {
+        console.error('No valid locales found in the catalog');
+      }
+      
+      console.log('Available locales:', this.localesCatalog);
+      console.log('Available locale codes:', this.locales);
+
+      // Get the current locale from the service
+      const currentLocale = this.localeService.currentLocale;
+      console.log('Current locale from service:', currentLocale);
+      
+      // Find the locale object for the current locale
+      this.currentLanguage = this.findLocale(currentLocale);
+      console.log('Current language object:', this.currentLanguage);
+      
+      // Initialize the language if not set
+      if (!this.currentLanguage && this.localesCatalog.length > 0) {
+        this.currentLanguage = this.localesCatalog[0];
+        console.log('Setting default language:', this.currentLanguage);
+        
+        // Apply the default language
         this.localeService.setLocale(this.currentLanguage.code);
       }
-    }
-    
-    // Force a check of the cookie and URL to ensure they match
-    setTimeout(() => {
-      const cookieLocale = this.localeService.currentLocale;
-      if (this.currentLanguage && this.currentLanguage.code !== cookieLocale) {
-        console.log('Cookie locale differs from component locale, updating');
-        const foundLocale = this.findLocale(cookieLocale);
-        if (foundLocale) {
-          this.currentLanguage = foundLocale;
-        }
+      
+      // Ensure the component always has a valid language selected
+      if (!this.currentLanguage && this.localesCatalog.length > 0) {
+        this.currentLanguage = this.localesCatalog[0];
+        console.log('Fallback to first available language:', this.currentLanguage);
       }
-    }, 0);
+    } catch (error) {
+      console.error('Error initializing locale selector:', error);
+      // Fallback to first locale if available
+      if (this.localesCatalog.length > 0) {
+        this.currentLanguage = this.localesCatalog[0];
+        console.log('Error recovery: setting default language:', this.currentLanguage);
+      }
+    }
   }
 
   private findLocale(locale: string): Locale | undefined {
