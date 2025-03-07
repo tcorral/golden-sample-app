@@ -14,8 +14,8 @@ jobs:
 
       - name: Install Aider CLI
         run: |
-          # Download the latest Aider CLI binary for Linux from its GitHub releases.
-          curl -L https://github.com/aider-ai/aider/releases/latest/download/aider-linux-amd64 -o aider
+          # Download the latest Aider CLI binary for Linux from the official repository.
+          curl -L https://github.com/paul-gauthier/aider/releases/latest/download/aider-linux-amd64 -o aider
           chmod +x aider
           sudo mv aider /usr/local/bin/
 
@@ -58,9 +58,9 @@ jobs:
 
       - name: Run Aider
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Set the model to use Anthropics Sonnet 3.7. You can override by setting the AIDER_MODEL secret.
-          MODEL: anthropic/claude-3-7-sonnet-20250219
+          AIDER_API_KEY: ${{ secrets.AIDER_API_KEY }}
+          # Use Anthropics Sonnet 3.7 by default (the alias "sonnet" per aider's docs)
+          AIDER_MODEL: ${{ secrets.AIDER_MODEL || 'sonnet' }}
         run: |
           # Build the prompt from the issue content.
           PROMPT="Issue Title: ${{ steps.parse_issue.outputs.ISSUE_TITLE }}
@@ -74,14 +74,14 @@ jobs:
           echo "Using prompt:"
           echo "$PROMPT"
 
-          # If "Files to modify" is provided, pass them to aider; otherwise, let aider analyze the entire repository.
+          # If "Files to modify" is provided, pass them to aider; otherwise, analyze the entire repository.
           if [ -n "${{ steps.parse_issue.outputs.FILES }}" ]; then
             FILES_TO_MODIFY="${{ steps.parse_issue.outputs.FILES }}"
             echo "Files to modify provided: $FILES_TO_MODIFY"
-            aider --model "$MODEL" --prompt "$PROMPT" --files "$FILES_TO_MODIFY"
+            aider --model "$AIDER_MODEL" --prompt "$PROMPT" --files "$FILES_TO_MODIFY"
           else
             echo "No files provided; analyzing entire repository."
-            aider --model "$MODEL" --prompt "$PROMPT"
+            aider --model "$AIDER_MODEL" --prompt "$PROMPT"
           fi
 
       - name: Commit changes
@@ -101,5 +101,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "Aider AI Changes for Issue #${{ github.event.issue.number }}"
           body: "This PR applies the changes suggested by Aider AI for issue #${{ github.event.issue.number }} using Anthropics Sonnet 3.7."
-          head: ${{ env.branch }}
+          branch: ${{ env.branch }}
           base: main
