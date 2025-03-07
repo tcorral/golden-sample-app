@@ -35,72 +35,62 @@ jobs:
         # Extract components from issue body
         BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g')
         DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## Files to modify/{flag=0} flag')
-        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## Acceptance criteria/{flag=0} flag' | sed -e 's/^* //' -e '/^$/d' -e 's/^ *//' | sort -u)
+        RAW_FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## Acceptance criteria/{flag=0} flag' | sed -e 's/^- //' -e '/^$/d' -e 's/^ *//')
         ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag')
 
-        # Process directories to find actual files
-        PROCESSED_FILES=""
-        if [ -n "$FILES" ]; then
-          while IFS= read -r path; do
-            if [ -d "$path" ]; then
-              PROCESSED_FILES+=" $(find "$path" -type f -print0 | xargs -0)"
-            elif [ -f "$path" ]; then
-              PROCESSED_FILES+=" $path"
-            fi
-          done <<< "$FILES"
-        else
-          PROCESSED_FILES=$(git ls-files | tr '\n' ' ')
-        fi
+        # Process files with full path validation
+        declare -a FILE_ARRAY
+        while IFS= read -r line; do
+          if [ -d "$line" ]; then
+            while IFS= read -r -d $'\0' file; do
+              FILE_ARRAY+=("$file")
+            done < <(find "$line" -type f -print0)
+          elif [ -f "$line" ]; then
+            FILE_ARRAY+=("$line")
+          fi
+        done <<< "$RAW_FILES"
 
-        # Format final files list
-        FILES=$(echo "$PROCESSED_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ $//')
+        # Remove duplicates and format as space-separated list
+        FILES=$(printf "%s\n" "${FILE_ARRAY[@]}" | sort -u | tr '\n' ' ' | sed 's/ $//')
         
-        # Create prompt
-        ACCEPTANCE=$(echo "$ACCEPTANCE" | sed 's/^[*-] *//g' | tr '\n' ' ' | sed 's/  \+/ /g')
-        
-        # Format prompt with clear instructions
-        PROMPT="Issue: ${{ github.event.issue.title }}
+        # Create technical implementation prompt
+        PROMPT="ANGULAR LOCALE SELECTOR FIX IMPLEMENTATION
 
-        **Problem Statement**
-        ${DESCRIPTION}
-
-        **Required Implementation**
-        1. Update the locale selector component to properly handle language selection
-        2. Implement cookie management for bb-locale
-        3. Ensure UI updates reflect selected language
-        4. Add page reload after locale change
-        5. Verify cross-browser compatibility
-
-        **Specific Technical Requirements**
-        - Use Angular's Location service for URL handling
-        - Implement CookieService for bb-locale management
-        - Add click handlers for language options
-        - Update component template to show current locale
-        - Add error handling for cookie operations
-
-        **Files to Modify**
+        COMPONENT FILES:
         ${FILES}
 
-        **Acceptance Criteria Validation**
-        - Test all language transitions
-        - Verify cookie persistence
-        - Check console for errors
-        - Confirm UI updates without full reload"
+        REQUIRED CHANGES:
+        1. Implement cookie-based locale persistence using @ngx-utils/cookies
+        2. Add click handlers to language options in template
+        3. Create locale update service with Subject observable
+        4. Add window.location.reload() after locale change
+        5. Implement error handling for cookie operations
+
+        TECHNICAL SPECIFICATIONS:
+        - Use Renderer2 for DOM manipulation
+        - Follow Angular style guide (SCSS)
+        - Maintain dependency injection
+        - Add JSDoc comments
+        - Include unit tests
+
+        ACCEPTANCE VALIDATION:
+        - Verify cookie 'bb-locale' updates on selection
+        - Confirm UI reflects new locale without errors
+        - Test cross-browser behavior (Chrome, Firefox, Safari)
+        - Ensure page reload maintains selected locale"
 
         echo "$PROMPT" > prompt.txt
-
         echo "$FILES" > files.txt
 
     - name: Run Aider
       env:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
-        FILES=$(cat files.txt)
-        echo "Processing files:"
-        echo "$FILES"
+        FILES=$(tr ' ' '\n' < files.txt | xargs -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
+        echo "Validated files: $FILES"
         echo "Final prompt content:"
         cat prompt.txt
-        cat prompt.txt | aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES --message "Implement the technical requirements exactly as outlined in the prompt"
+        aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt)
 
     - name: Check for changes
       id: changes
