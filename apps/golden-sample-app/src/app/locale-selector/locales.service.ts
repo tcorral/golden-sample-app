@@ -1,14 +1,30 @@
 import { DOCUMENT, LocationStrategy } from '@angular/common';
 import { Inject, Injectable, InjectionToken, LOCALE_ID, OnInit } from '@angular/core';
 
+/**
+ * Interface for cookie options
+ */
+export interface CookieOptions {
+  path?: string;
+  domain?: string;
+  expires?: string | Date;
+  secure?: boolean;
+  sameSite?: 'Strict' | 'Lax' | 'None';
+}
+
+/**
+ * Interface for URL construction options
+ */
+export interface UrlOptions {
+  baseHref: string;
+  locale: string;
+  currentPath: string;
+}
+
 // eslint-disable-next-line @typescript-eslint/array-type
 export const LOCALES_LIST = new InjectionToken<Array<string>>(
   'List of locales available'
 );
-
-// Use 2038 year to avoid issues with some browsers that don't support dates after 2038
-const COOKIE_ATTRIBUTES =
-  'expires=Tue, 19 Jan 2038 04:14:07 GMT; secure; samesite=Lax;';
 
 const COOKIE_NAME = 'bb-locale';
 
@@ -135,16 +151,61 @@ export class LocalesService implements OnInit {
    * @param baseHref The base href for the cookie path
    */
   private setCookie(locale: string, baseHref: string): void {
-    const cookieValue = `${COOKIE_NAME}=${encodeURIComponent(locale)}`;
-    const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
+    const cookieOptions: CookieOptions = {
+      path: baseHref === '' ? '/' : baseHref,
+      secure: true,
+      sameSite: 'Lax'
+    };
     
     // Clear any existing cookie first
-    this.document.cookie = `${COOKIE_NAME}=; ${cookiePath}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    const expiredOptions: CookieOptions = {
+      ...cookieOptions,
+      expires: 'Thu, 01 Jan 1970 00:00:00 GMT'
+    };
+    this.setCookieWithOptions(COOKIE_NAME, '', expiredOptions);
     
-    // Set the new cookie
-    this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
-      '; '
-    );
+    // Set the new cookie with future expiration
+    const futureOptions: CookieOptions = {
+      ...cookieOptions,
+      expires: 'Tue, 19 Jan 2038 04:14:07 GMT'
+    };
+    this.setCookieWithOptions(COOKIE_NAME, locale, futureOptions);
+  }
+
+  /**
+   * Sets a cookie with the given options
+   * @param name The cookie name
+   * @param value The cookie value
+   * @param options The cookie options
+   */
+  private setCookieWithOptions(name: string, value: string, options: CookieOptions): void {
+    const cookieParts: string[] = [`${name}=${encodeURIComponent(value)}`];
+    
+    if (options.path) {
+      cookieParts.push(`path=${options.path}`);
+    }
+    
+    if (options.domain) {
+      cookieParts.push(`domain=${options.domain}`);
+    }
+    
+    if (options.expires) {
+      if (options.expires instanceof Date) {
+        cookieParts.push(`expires=${options.expires.toUTCString()}`);
+      } else {
+        cookieParts.push(`expires=${options.expires}`);
+      }
+    }
+    
+    if (options.secure) {
+      cookieParts.push('secure');
+    }
+    
+    if (options.sameSite) {
+      cookieParts.push(`samesite=${options.sameSite}`);
+    }
+    
+    this.document.cookie = cookieParts.join('; ');
   }
 
   /**
@@ -154,13 +215,18 @@ export class LocalesService implements OnInit {
    */
   private updateUrlWithLocale(locale: string, baseHref: string): void {
     const currentPath = this.document.location.pathname;
+    const urlOptions: UrlOptions = {
+      baseHref,
+      locale,
+      currentPath
+    };
     
     // Escape special characters in baseHref for regex
-    const escapedBaseHref = baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedBaseHref = urlOptions.baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
     // First check if the path already contains the target locale
-    const targetLocalePattern = new RegExp(`^${escapedBaseHref}/${locale}(/|$)`);
-    if (targetLocalePattern.test(currentPath)) {
+    const targetLocalePattern = new RegExp(`^${escapedBaseHref}/${urlOptions.locale}(/|$)`);
+    if (targetLocalePattern.test(urlOptions.currentPath)) {
       // Even if the URL has the correct locale, we need to refresh to apply the locale change
       this.document.location.reload();
       return;
@@ -168,21 +234,21 @@ export class LocalesService implements OnInit {
     
     // Check if the current path already has a locale
     let localeFound = false;
-    let newPath = currentPath;
+    let newPath = urlOptions.currentPath;
     
     for (const availableLocale of this.availableLocales) {
       // Create a pattern that matches the locale at the beginning of the path or after baseHref
       const localePattern = new RegExp(`^${escapedBaseHref}/${availableLocale}(/|$)`);
-      if (localePattern.test(currentPath)) {
+      if (localePattern.test(urlOptions.currentPath)) {
         // Replace existing locale in the path
-        newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
+        newPath = urlOptions.currentPath.replace(localePattern, `${urlOptions.baseHref}/${urlOptions.locale}/`);
         localeFound = true;
         break;
       }
     }
     
     if (!localeFound) {
-      newPath = this.constructPathWithLocale(locale, baseHref, currentPath);
+      newPath = this.constructPathWithLocale(urlOptions.locale, urlOptions.baseHref, urlOptions.currentPath);
     }
     
     // Preserve query parameters and hash
@@ -199,22 +265,28 @@ export class LocalesService implements OnInit {
    * @returns The new path with the locale added
    */
   private constructPathWithLocale(locale: string, baseHref: string, currentPath: string): string {
+    const options: UrlOptions = {
+      baseHref,
+      locale,
+      currentPath
+    };
+    
     // No locale in path, add the new locale
     if (currentPath === baseHref || currentPath === `${baseHref}/`) {
       // If we're at the root path, simply append the locale
-      return `${baseHref}/${locale}/`;
+      return `${options.baseHref}/${options.locale}/`;
     } else {
       // Otherwise, insert the locale after the base href
-      const pathAfterBaseHref = currentPath.startsWith(baseHref) 
-        ? currentPath.substring(baseHref.length) 
-        : currentPath;
+      const pathAfterBaseHref = options.currentPath.startsWith(options.baseHref) 
+        ? options.currentPath.substring(options.baseHref.length) 
+        : options.currentPath;
       
       // Ensure path starts with a slash if needed
       const normalizedPath = pathAfterBaseHref.startsWith('/') 
         ? pathAfterBaseHref 
         : `/${pathAfterBaseHref}`;
       
-      return `${baseHref}/${locale}${normalizedPath}`;
+      return `${options.baseHref}/${options.locale}${normalizedPath}`;
     }
   }
 

@@ -2,7 +2,23 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { LOCALES_LIST, LocalesService } from './locales.service';
 import { localesCatalog } from './locales-catalog';
 
-type Locale = (typeof localesCatalog)[string];
+/**
+ * Interface representing a locale with its display properties
+ */
+export interface Locale {
+  code: string;
+  name: string;
+  nativeName: string;
+  flag?: string;
+}
+
+/**
+ * Interface for dropdown selection events
+ */
+export interface DropdownSelection {
+  value: Locale | string;
+  label?: string;
+}
 
 @Component({
   selector: 'app-locale-selector',
@@ -21,7 +37,7 @@ export class LocaleSelectorComponent implements OnInit {
    * Sets the language based on the selected value from the dropdown
    * @param value The selected language value
    */
-  set language(value: string | object | Locale | undefined) {
+  set language(value: string | DropdownSelection | Locale | undefined) {
     if (!value) {
       return;
     }
@@ -57,10 +73,10 @@ export class LocaleSelectorComponent implements OnInit {
    * Handles object values for language selection
    * @param value The object value to process
    */
-  private handleObjectValue(value: object): void {
+  private handleObjectValue(value: DropdownSelection | Locale): void {
     // Handle dropdown menu selection which comes as {value: Locale}
     if ('value' in value) {
-      const dropdownValue = (value as any).value;
+      const dropdownValue = value.value;
       
       if (typeof dropdownValue === 'object' && 'code' in dropdownValue) {
         // It's a dropdown selection with a Locale value
@@ -75,7 +91,7 @@ export class LocaleSelectorComponent implements OnInit {
       }
     } 
     // Handle direct Locale object
-    else if ('code' in value && typeof (value as any).code === 'string') {
+    else if ('code' in value && typeof value.code === 'string') {
       // It's a Locale object
       const locale = value as Locale;
       if (this.currentLanguage?.code !== locale.code) {
