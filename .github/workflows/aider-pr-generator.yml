@@ -67,7 +67,7 @@ jobs:
         FILES=$(cat files.txt)
         echo "Processing files:"
         echo "$FILES"
-        cat prompt.txt | aider --yes --model claude-3-opus $FILES
+        cat prompt.txt | aider --yes --model anthropic.claude-3-5-sonnet-20240620-v1:0 $FILES
 
     - name: Check for changes
       id: changes
