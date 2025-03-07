@@ -105,53 +105,52 @@ export class LocalesService implements OnInit {
     );
     console.log(`Set cookie: ${cookieValue}`);
 
-    if (locale !== currentLocale) {
-      // Force reload with the new locale
-      const currentPath = this.document.location.pathname;
-      console.log(`Current path: ${currentPath}`);
-      
-      // Check if the current path already has a locale
-      let localeFound = false;
-      let newPath = currentPath;
-      
-      for (const availableLocale of this.availableLocales) {
-        const localePattern = new RegExp(`^${baseHref}/${availableLocale}/`);
-        if (localePattern.test(currentPath)) {
-          // Replace existing locale in the path
-          newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
-          console.log(`Replacing locale ${availableLocale} with ${locale} in path: ${newPath}`);
-          localeFound = true;
-          break;
-        }
+    // Always redirect to apply the locale change
+    // Force reload with the new locale
+    const currentPath = this.document.location.pathname;
+    console.log(`Current path: ${currentPath}`);
+    
+    // Check if the current path already has a locale
+    let localeFound = false;
+    let newPath = currentPath;
+    
+    for (const availableLocale of this.availableLocales) {
+      const localePattern = new RegExp(`^${baseHref}/${availableLocale}(/|$)`);
+      if (localePattern.test(currentPath)) {
+        // Replace existing locale in the path
+        newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
+        console.log(`Replacing locale ${availableLocale} with ${locale} in path: ${newPath}`);
+        localeFound = true;
+        break;
       }
-      
-      if (!localeFound) {
-        // No locale in path, add the new locale
-        if (currentPath === baseHref || currentPath === `${baseHref}/`) {
-          // If we're at the root path, simply append the locale
-          newPath = `${baseHref}/${locale}/`;
-        } else {
-          // Otherwise, insert the locale after the base href
-          const pathAfterBaseHref = currentPath.startsWith(baseHref) 
-            ? currentPath.substring(baseHref.length) 
-            : currentPath;
-          
-          // Ensure path starts with a slash if needed
-          const normalizedPath = pathAfterBaseHref.startsWith('/') 
-            ? pathAfterBaseHref 
-            : `/${pathAfterBaseHref}`;
-          
-          newPath = `${baseHref}/${locale}${normalizedPath}`;
-        }
-        console.log(`Adding locale to path: ${newPath}`);
-      }
-      
-      // Preserve query parameters and hash
-      const queryAndHash = this.document.location.search + this.document.location.hash;
-      const finalUrl = newPath + queryAndHash;
-      console.log(`Redirecting to: ${finalUrl}`);
-      this.document.location.href = finalUrl;
     }
+    
+    if (!localeFound) {
+      // No locale in path, add the new locale
+      if (currentPath === baseHref || currentPath === `${baseHref}/`) {
+        // If we're at the root path, simply append the locale
+        newPath = `${baseHref}/${locale}/`;
+      } else {
+        // Otherwise, insert the locale after the base href
+        const pathAfterBaseHref = currentPath.startsWith(baseHref) 
+          ? currentPath.substring(baseHref.length) 
+          : currentPath;
+        
+        // Ensure path starts with a slash if needed
+        const normalizedPath = pathAfterBaseHref.startsWith('/') 
+          ? pathAfterBaseHref 
+          : `/${pathAfterBaseHref}`;
+        
+        newPath = `${baseHref}/${locale}${normalizedPath}`;
+      }
+      console.log(`Adding locale to path: ${newPath}`);
+    }
+    
+    // Preserve query parameters and hash
+    const queryAndHash = this.document.location.search + this.document.location.hash;
+    const finalUrl = newPath + queryAndHash;
+    console.log(`Redirecting to: ${finalUrl}`);
+    this.document.location.href = finalUrl;
   }
 
   get currentLocale() {
