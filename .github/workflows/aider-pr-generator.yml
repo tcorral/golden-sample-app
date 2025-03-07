@@ -29,20 +29,34 @@ jobs:
     - name: Install Aider
       run: pip install aider-chat
 
-    # Rest of the workflow remains the same as before...
-    - name: Extract issue sections
+      - name: Extract issue sections
       id: extract-sections
       run: |
         BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g')
         DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## |^$/{flag=0} flag')
-        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## |^$/{flag=0} flag' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr -d '\r' | xargs)
+        FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## |^$/{flag=0} flag' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr -d '\r')
         ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /## |^$/{flag=0} flag')
 
-        if [ -z "$FILES" ]; then
+        # Process files/directories
+        PROCESSED_FILES=""
+        if [ -n "$FILES" ]; then
+          while IFS= read -r line; do
+            for item in $line; do
+              if [ -d "$item" ]; then
+                PROCESSED_FILES+=" $(find "$item" -type f -print0 | xargs -0)"
+              elif [ -f "$item" ]; then
+                PROCESSED_FILES+=" $item"
+              fi
+            done
+          done <<< "$FILES"
+        else
           # Get all files in repo (excluding directories)
-          FILES=$(git ls-files -z | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
+          PROCESSED_FILES=$(git ls-files -z | xargs -0 -I{} sh -c '[ -f "{}" ] && echo "{}"' | tr '\n' ' ')
         fi
 
+        # Remove duplicates and format
+        FILES=$(echo "$PROCESSED_FILES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ $//')
+        
         PROMPT="Issue Title: ${{ github.event.issue.title }}\n\nDescription:\n$DESCRIPTION\n\nAcceptance Criteria:\n$ACCEPTANCE"
         echo -e "$PROMPT" > prompt.txt
         echo "$FILES" > files.txt
@@ -52,8 +66,9 @@ jobs:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       run: |
         FILES=$(cat files.txt)
-        echo "Files to process: $FILES"
-        cat prompt.txt | aider --yes --model claude-3-opus $FILES
+        echo "Processing files: $FILES"
+        # Use xargs to handle spaces in filenames properly
+        echo "$FILES" | xargs -n 1 | aider --yes --model claude-3-opus $(cat prompt.txt)
 
     - name: Check for changes
       id: changes
