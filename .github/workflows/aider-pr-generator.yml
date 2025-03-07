@@ -85,10 +85,10 @@ jobs:
             CLEAN_FILES=$(echo "$RAW_FILES" | sed 's/^\s*\*\s*//g' | tr '\n' ' ')
             echo "Resolved files to modify: $CLEAN_FILES"
             # Pass the cleaned file list as positional arguments.
-            aider --model "$AIDER_MODEL" --message "$MESSAGE" $CLEAN_FILES
+            aider --yes-always --model "$AIDER_MODEL" --message "$MESSAGE" $CLEAN_FILES
           else
             echo "No files provided; analyzing entire repository."
-            aider --model "$AIDER_MODEL" --message "$MESSAGE"
+            aider --yes-always --model "$AIDER_MODEL" --message "$MESSAGE"
           fi
 
       - name: Commit changes
