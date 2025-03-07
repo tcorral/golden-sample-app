@@ -59,7 +59,8 @@ jobs:
         echo "Validated files: $FILES"
         echo "Final prompt content:"
         cat prompt.txt
-        aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt)
+        aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt) \
+          --commit-message "Fix: ${{ github.event.issue.title }} (closes #${{ github.event.issue.number }})"
 
     - name: Debug Aider changes
       run: |
@@ -68,42 +69,17 @@ jobs:
         echo "Files modified:"
         git diff --name-only
 
-    - name: Check for changes
-      id: changes
-      run: |
-        git add .
-        # Check against main branch instead of working tree
-        if ! git diff --quiet main HEAD; then
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "Changes detected against main:"
-          git diff main HEAD --name-only
-        else
-          echo "has_changes=false" >> $GITHUB_OUTPUT
-          echo "No changes detected compared to main"
-        fi
-    
-    - name: Create branch and commit
+    - name: Create and push branch
       if: steps.changes.outputs.has_changes == 'true'
       run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "actions@github.com"
         BRANCH_NAME="aider-fix-${{ github.event.issue.number }}"
         echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-        
-        # Create fresh branch from current HEAD
-        git checkout -b $BRANCH_NAME
-        git add -A
-        git commit -m "Fix: ${{ github.event.issue.title }} (issue #${{ github.event.issue.number }})"
-        echo "Commit created with hash:"
-        git rev-parse HEAD
-  
-    - name: Push changes
-      if: steps.changes.outputs.has_changes == 'true'
-      run: |
-        git fetch origin main  # Ensure we have latest main
-        git push origin ${{ env.BRANCH_NAME }} --force-with-lease
-        echo "Branch pushed with:"
-        git log --oneline origin/main..${{ env.BRANCH_NAME }}
+        # Check if branch already exists
+        git checkout -B $BRANCH_NAME
+        # Push with lease to ensure we don't overwrite concurrent changes
+        git push origin $BRANCH_NAME --force-with-lease
+        echo "Pushed Aider's commit directly:"
+        git log -1
   
     - name: Verify Remote Branch
       run: |
@@ -120,14 +96,12 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         title: "fix: ${{ github.event.issue.title }}"
         body: |
-          **Automated Fix Summary**
-          - Addresses issue #${{ github.event.issue.number }}
-          - Implemented by Aider AI assistant
-          - Branch: ${{ env.BRANCH_NAME }}
+          **Automated Fix Summary**  
+          - Addresses issue #${{ github.event.issue.number }}  
+          - Implemented by Aider AI assistant  
+          - Branch: ${{ env.BRANCH_NAME }}  
+          - Commit: $(git rev-parse HEAD)
         branch: ${{ env.BRANCH_NAME }}
         base: main
         delete-branch: false
-        commit-message: "Apply automated fixes for #${{ github.event.issue.number }}"
-        author: "GitHub Actions <actions@github.com>"
-        committer: "GitHub Actions <actions@github.com>"
-        labels: aider,automated-fix
+
