@@ -59,8 +59,23 @@ jobs:
         echo "Validated files: $FILES"
         echo "Final prompt content:"
         cat prompt.txt
-        aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES <<< $(cat prompt.txt) \
-          --commit-message "Fix: ${{ github.event.issue.title }} (closes #${{ github.event.issue.number }})"
+        
+        # Run Aider with commit message in the prompt
+        { echo -e "$(cat prompt.txt)\n\nCOMMIT_MESSAGE: Fix locale selector - ${{ github.event.issue.title }} (#${{ github.event.issue.number }})"; } | \
+          aider --yes --model anthropic/claude-3-7-sonnet-latest $FILES
+
+    - name: Check for changes
+      id: changes
+      run: |
+        git fetch origin main
+        if ! git diff --quiet main HEAD; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Changes detected:"
+          git diff main HEAD --stat
+        else
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "No changes detected"
+        fi
 
     - name: Debug Aider changes
       run: |
@@ -74,11 +89,9 @@ jobs:
       run: |
         BRANCH_NAME="aider-fix-${{ github.event.issue.number }}"
         echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-        # Check if branch already exists
         git checkout -B $BRANCH_NAME
-        # Push with lease to ensure we don't overwrite concurrent changes
         git push origin $BRANCH_NAME --force-with-lease
-        echo "Pushed Aider's commit directly:"
+        echo "Branch pushed with commit:"
         git log -1
   
     - name: Verify Remote Branch
