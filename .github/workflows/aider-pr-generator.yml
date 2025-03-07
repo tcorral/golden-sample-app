@@ -24,16 +24,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Aider
+      - name: Install Aider and dependencies
         run: |
           pip install aider-chat
           pip install GitPython
 
-      - name: Parse issue and run Aider
-        id: run-aider
+      - name: Parse issue and prepare for Aider
+        id: parse-issue
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -41,8 +39,6 @@ jobs:
           python -c "
           import os
           import re
-          import subprocess
-          import git
           import json
           
           # Get issue details
@@ -69,20 +65,8 @@ jobs:
           if criteria_match:
               acceptance_criteria = criteria_match.group(1).strip()
           
-          # Create a new branch
-          repo = git.Repo('.')
+          # Create branch name
           branch_name = f'fix/issue-{issue_number}'
-          
-          # Make sure we're on the main branch first
-          repo.git.checkout('main')
-          
-          # Create a new branch or checkout if it exists
-          try:
-              repo.git.checkout('-b', branch_name)
-              print(f'Created and switched to branch {branch_name}')
-          except git.GitCommandError:
-              repo.git.checkout(branch_name)
-              print(f'Switched to existing branch {branch_name}')
           
           # Construct prompt for Aider
           prompt = f\"\"\"
@@ -97,75 +81,170 @@ jobs:
           Please implement the necessary changes to address this issue.
           \"\"\"
           
-          # Write prompt to a file for debugging
+          # Write prompt to a file
           with open('aider_prompt.txt', 'w') as f:
               f.write(prompt)
           
-          # Run Aider with the appropriate files
-          aider_command = ['aider']
-          if files_to_modify:
-              aider_command.extend(files_to_modify)
+          # Save files to modify to a JSON file
+          with open('files_to_modify.json', 'w') as f:
+              json.dump(files_to_modify, f)
           
-          # Run Aider with the prompt
-          process = subprocess.Popen(
-              aider_command,
-              stdin=subprocess.PIPE,
-              stdout=subprocess.PIPE,
-              stderr=subprocess.PIPE,
-              text=True
-          )
+          # Save branch name and issue info
+          with open('issue_info.json', 'w') as f:
+              json.dump({
+                  'branch_name': branch_name,
+                  'issue_number': issue_number,
+                  'issue_title': issue_title,
+                  'description': description,
+                  'acceptance_criteria': acceptance_criteria
+              }, f)
           
-          stdout, stderr = process.communicate(input=prompt)
-          
-          # Check if Aider made any changes
-          status = repo.git.status('--porcelain')
-          if status:
-              # Commit changes
-              repo.git.add('.')
-              repo.git.commit('-m', f'Fix issue #{issue_number}: {issue_title}')
-              
-              # Push changes
-              repo.git.push('--set-upstream', 'origin', branch_name)
-              
-              # Write PR details for next step
-              pr_title = f'Fix issue #{issue_number}: {issue_title}'
-              pr_body = f'''
-              This PR addresses issue #{issue_number}
-              
-              ## Description
-              {description}
-              
-              ## Acceptance Criteria
-              {acceptance_criteria}
-              
-              Automated changes made by Aider.
-              '''
-              
-              with open('pr_details.json', 'w') as f:
-                  json.dump({
-                      'title': pr_title,
-                      'body': pr_body,
-                      'branch': branch_name
-                  }, f)
-              
-              # Use GitHub environment file instead of set-output
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  f.write('changes_made=true\\n')
-                  f.write(f'branch_name={branch_name}\\n')
-          else:
-              print('No changes were made by Aider')
-              # Use GitHub environment file instead of set-output
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  f.write('changes_made=false\\n')
+          # Write to GitHub outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'branch_name={branch_name}\\n')
           "
+
+      - name: Create and switch to branch
+        id: create-branch
+        run: |
+          ISSUE_INFO=$(cat issue_info.json)
+          BRANCH_NAME=$(echo $ISSUE_INFO | jq -r '.branch_name')
+          
+          # Make sure we're on the main branch first
+          git checkout main
+          
+          # Create a new branch or checkout if it exists
+          if git show-ref --verify --quiet refs/heads/$BRANCH_NAME; then
+            git checkout $BRANCH_NAME
+            echo "Switched to existing branch $BRANCH_NAME"
+          else
+            git checkout -b $BRANCH_NAME
+            echo "Created and switched to branch $BRANCH_NAME"
+          fi
+          
+          # Set git identity for the commit
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+
+      - name: Run Aider on files
+        id: run-aider
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Load the files to modify
+          FILES_TO_MODIFY=$(cat files_to_modify.json)
+          PROMPT=$(cat aider_prompt.txt)
+          
+          echo "Running Aider with prompt:"
+          echo "$PROMPT"
+          
+          # Create an Aider script that will run non-interactively
+          cat > run_aider.py << 'EOF'
+          import os
+          import sys
+          import json
+          import subprocess
+          from pathlib import Path
+          
+          # Load files to modify
+          with open('files_to_modify.json', 'r') as f:
+              files_to_modify = json.load(f)
+          
+          # Load prompt
+          with open('aider_prompt.txt', 'r') as f:
+              prompt = f.read()
+          
+          # Get OpenAI API key from environment
+          openai_api_key = os.environ.get('OPENAI_API_KEY')
+          if not openai_api_key:
+              print("Error: OPENAI_API_KEY environment variable not set")
+              sys.exit(1)
+          
+          # Prepare Aider command
+          aider_cmd = ['aider', '--no-auto-commit', '--yes']
+          
+          # Add files to modify if specified
+          if files_to_modify:
+              aider_cmd.extend(files_to_modify)
+          
+          # Add --apply flag to run non-interactively
+          aider_cmd.append('--apply')
+          
+          # Write prompt to a temporary file that Aider can read
+          prompt_file = Path('prompt_for_aider.txt')
+          prompt_file.write_text(prompt)
+          
+          # Add prompt file to command
+          aider_cmd.extend(['--message-file', 'prompt_for_aider.txt'])
+          
+          # Run Aider
+          print(f"Running command: {' '.join(aider_cmd)}")
+          result = subprocess.run(aider_cmd, capture_output=True, text=True)
+          
+          # Log the output
+          print("Aider stdout:")
+          print(result.stdout)
+          
+          print("Aider stderr:")
+          print(result.stderr)
+          
+          # Check exit code
+          print(f"Aider exit code: {result.returncode}")
+          
+          # Write true/false to a file based on whether changes were made
+          changes_made = result.returncode == 0 and "No changes to commit" not in result.stdout
+          with open('changes_made.txt', 'w') as f:
+              f.write(str(changes_made).lower())
+          EOF
+          
+          # Run the Aider script
+          python run_aider.py
+          
+          # Check if changes were made
+          CHANGES_MADE=$(cat changes_made.txt)
+          echo "Changes made: $CHANGES_MADE"
+          
+          # Write to GitHub outputs
+          echo "changes_made=$CHANGES_MADE" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.run-aider.outputs.changes_made == 'true'
+        run: |
+          # Check if there are changes to commit
+          if [[ -n $(git status --porcelain) ]]; then
+            # Commit the changes
+            ISSUE_INFO=$(cat issue_info.json)
+            ISSUE_NUMBER=$(echo $ISSUE_INFO | jq -r '.issue_number')
+            ISSUE_TITLE=$(echo $ISSUE_INFO | jq -r '.issue_title')
+            BRANCH_NAME=$(echo $ISSUE_INFO | jq -r '.branch_name')
+            
+            git add .
+            git commit -m "Fix issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+            git push --set-upstream origin $BRANCH_NAME
+            
+            echo "changes_committed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes to commit"
+            echo "changes_committed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Pull Request
         if: steps.run-aider.outputs.changes_made == 'true'
         run: |
-          PR_DETAILS=$(cat pr_details.json)
-          PR_TITLE=$(echo $PR_DETAILS | jq -r '.title')
-          PR_BODY=$(echo $PR_DETAILS | jq -r '.body')
-          BRANCH_NAME=$(echo $PR_DETAILS | jq -r '.branch')
+          ISSUE_INFO=$(cat issue_info.json)
+          ISSUE_NUMBER=$(echo $ISSUE_INFO | jq -r '.issue_number')
+          ISSUE_TITLE=$(echo $ISSUE_INFO | jq -r '.issue_title')
+          BRANCH_NAME=$(echo $ISSUE_INFO | jq -r '.branch_name')
+          DESCRIPTION=$(echo $ISSUE_INFO | jq -r '.description')
+          ACCEPTANCE_CRITERIA=$(echo $ISSUE_INFO | jq -r '.acceptance_criteria')
+          
+          PR_TITLE="Fix issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+          PR_BODY="This PR addresses issue #${ISSUE_NUMBER} \
+            ## Description \
+            ${DESCRIPTION} \
+            ## Acceptance Criteria \
+            ${ACCEPTANCE_CRITERIA} \
+            Automated changes made by Aider."
           
           gh pr create \
             --title "$PR_TITLE" \
