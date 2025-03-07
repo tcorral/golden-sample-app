@@ -38,6 +38,11 @@ export class LocaleSelectorComponent implements OnInit {
     );
 
     this.currentLanguage = this.findLocale(this.localeService.currentLocale);
+    
+    // Initialize the language if not set
+    if (!this.currentLanguage && this.localesCatalog.length > 0) {
+      this.currentLanguage = this.localesCatalog[0];
+    }
   }
 
   private findLocale(locale: string): Locale | undefined {
