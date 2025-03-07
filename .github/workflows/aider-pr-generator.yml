@@ -32,30 +32,52 @@ jobs:
     - name: Extract issue sections
       id: extract-sections
       run: |
-        # Extract and clean markdown content
-        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g; s/^## //; s/^\* //; s/\*\*//g')
+        # Extract components from issue body
+        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g')
+        DESCRIPTION=$(echo "$BODY" | awk '/## Description/{flag=1; next} /## Files to modify/{flag=0} flag')
+        RAW_FILES=$(echo "$BODY" | awk '/## Files to modify/{flag=1; next} /## Acceptance criteria/{flag=0} flag' | sed -e 's/^- //' -e '/^$/d' -e 's/^ *//')
+        ACCEPTANCE=$(echo "$BODY" | awk '/## Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag')
+
+        # Process files with full path validation
+        declare -a FILE_ARRAY
+        while IFS= read -r line; do
+          if [ -d "$line" ]; then
+            while IFS= read -r -d $'\0' file; do
+              FILE_ARRAY+=("$file")
+            done < <(find "$line" -type f -print0)
+          elif [ -f "$line" ]; then
+            FILE_ARRAY+=("$line")
+          fi
+        done <<< "$RAW_FILES"
+
+        # Remove duplicates and format as space-separated list
+        FILES=$(printf "%s\n" "${FILE_ARRAY[@]}" | sort -u | tr '\n' ' ' | sed 's/ $//')
         
-        # Extract components using improved markdown parsing
-        DESCRIPTION=$(echo "$BODY" | awk '/^Description/{flag=1; next} /^Files to modify|^Acceptance criteria/{flag=0} flag' | sed '/^$/d')
-        FILES=$(echo "$BODY" | awk '/^Files to modify/{flag=1; next} /^Acceptance criteria/{flag=0} flag' | 
-                sed -e 's/^ *//' -e '/^$/d' | while read -r line; do
-                  if [ -d "$line" ]; then
-                    find "$line" -type f
-                  else
-                    echo "$line"
-                  fi
-                done | sort -u | tr '\n' ' ')
-        ACCEPTANCE=$(echo "$BODY" | awk '/^Acceptance criteria/{flag=1; next} /^```|^$/{flag=0} flag' | tr '\n' ' ' | sed 's/  \+/ /g')
+        # Create technical implementation prompt
+        PROMPT="ANGULAR LOCALE SELECTOR FIX IMPLEMENTATION
 
-        # Validate required content
-        if [ -z "$FILES" ]; then
-          echo "Error: No valid files found to modify"
-          exit 1
-        fi
+        COMPONENT FILES:
+        ${FILES}
 
-        # Create prompt with proper quoting
-        PROMPT=$(printf "######## PROBLEM STATEMENT ########\n%s\n\n######## TECHNICAL REQUIREMENTS ########\n%s\n\n######## FILES TO MODIFY ########\n%s\n\n######## IMPLEMENTATION NOTES ########\n- Fix all issues in ONE commit\n- Maintain Angular coding standards\n- Add necessary TypeScript interfaces\n- Update related test files" \
-                "$DESCRIPTION" "$ACCEPTANCE" "$FILES")
+        REQUIRED CHANGES:
+        1. Implement cookie-based locale persistence using @ngx-utils/cookies
+        2. Add click handlers to language options in template
+        3. Create locale update service with Subject observable
+        4. Add window.location.reload() after locale change
+        5. Implement error handling for cookie operations
+
+        TECHNICAL SPECIFICATIONS:
+        - Use Renderer2 for DOM manipulation
+        - Follow Angular style guide (SCSS)
+        - Maintain dependency injection
+        - Add JSDoc comments
+        - Include unit tests
+
+        ACCEPTANCE VALIDATION:
+        - Verify cookie 'bb-locale' updates on selection
+        - Confirm UI reflects new locale without errors
+        - Test cross-browser behavior (Chrome, Firefox, Safari)
+        - Ensure page reload maintains selected locale"
 
         echo "$PROMPT" > prompt.txt
         echo "$FILES" > files.txt
