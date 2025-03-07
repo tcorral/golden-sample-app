@@ -1,5 +1,5 @@
 import { DOCUMENT, LocationStrategy } from '@angular/common';
-import { Inject, Injectable, InjectionToken, LOCALE_ID } from '@angular/core';
+import { Inject, Injectable, InjectionToken, LOCALE_ID, OnInit } from '@angular/core';
 
 // eslint-disable-next-line @typescript-eslint/array-type
 export const LOCALES_LIST = new InjectionToken<Array<string>>(
@@ -10,17 +10,63 @@ export const LOCALES_LIST = new InjectionToken<Array<string>>(
 const COOKIE_ATTRIBUTES =
   'expires=Tue, 19 Jan 2038 04:14:07 GMT; secure; samesite=Lax;';
 
+const COOKIE_NAME = 'bb-locale';
+
 @Injectable()
-export class LocalesService {
+export class LocalesService implements OnInit {
+  private _currentLocale: string;
+
   constructor(
     private location: LocationStrategy,
     @Inject(LOCALE_ID) private locale: string,
-    @Inject(DOCUMENT) private document: Document
-  ) {}
+    @Inject(DOCUMENT) private document: Document,
+    @Inject(LOCALES_LIST) private availableLocales: string[]
+  ) {
+    this._currentLocale = locale;
+    this.initLocaleFromCookie();
+  }
+
+  ngOnInit(): void {
+    this.initLocaleFromCookie();
+  }
+
+  private initLocaleFromCookie(): void {
+    const cookieLocale = this.getCookieValue(COOKIE_NAME);
+    console.log(`Cookie locale: ${cookieLocale}`);
+    
+    if (cookieLocale && this.availableLocales.includes(cookieLocale) && cookieLocale !== this._currentLocale) {
+      console.log(`Applying cookie locale: ${cookieLocale}`);
+      this._currentLocale = cookieLocale;
+      
+      // Apply the locale from cookie if it's different from the current URL
+      const currentPath = this.document.location.pathname;
+      const baseHref = this.location.getBaseHref();
+      const localePattern = new RegExp(`^${baseHref}/${this.locale}/`);
+      
+      if (!localePattern.test(currentPath)) {
+        console.log(`Current URL doesn't match cookie locale, redirecting...`);
+        this.setLocale(cookieLocale);
+      }
+    }
+  }
+
+  private getCookieValue(name: string): string | null {
+    const cookies = this.document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [cookieName, cookieValue] = cookie.trim().split('=');
+      if (cookieName === encodeURIComponent(name)) {
+        return decodeURIComponent(cookieValue);
+      }
+    }
+    return null;
+  }
 
   setLocale(locale: string) {
-    const currentLocale = this.locale;
+    const currentLocale = this._currentLocale;
     console.log(`Setting locale from ${currentLocale} to ${locale}`);
+
+    // Update internal state
+    this._currentLocale = locale;
 
     // Get base href without locale
     const baseHref = this.location
@@ -28,9 +74,8 @@ export class LocalesService {
       .replace(new RegExp(`/${currentLocale}/?$`), '');
     console.log(`Base href: ${baseHref}`);
 
-    const cookieValue = `${encodeURIComponent(
-      'bb-locale'
-    )}=${encodeURIComponent(locale)}`;
+    // Set the cookie with the new locale
+    const cookieValue = `${encodeURIComponent(COOKIE_NAME)}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
 
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
@@ -65,6 +110,6 @@ export class LocalesService {
   }
 
   get currentLocale() {
-    return this.locale;
+    return this._currentLocale;
   }
 }
