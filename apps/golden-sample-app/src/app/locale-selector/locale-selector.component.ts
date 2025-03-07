@@ -19,6 +19,12 @@ export class LocaleSelectorComponent implements OnInit {
 
   set language(value: string | object | Locale | undefined) {
     if (typeof value === 'string') {
+      // Handle string values as well, which might come from the dropdown
+      const foundLocale = this.findLocale(value as string);
+      if (foundLocale) {
+        this.currentLanguage = foundLocale;
+        this.localeService.setLocale(foundLocale.code);
+      }
       return;
     }
     

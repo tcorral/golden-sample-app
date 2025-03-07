@@ -20,11 +20,13 @@ export class LocalesService {
 
   setLocale(locale: string) {
     const currentLocale = this.locale;
+    console.log(`Setting locale from ${currentLocale} to ${locale}`);
 
     // Get base href without locale
     const baseHref = this.location
       .getBaseHref()
       .replace(new RegExp(`/${currentLocale}/?$`), '');
+    console.log(`Base href: ${baseHref}`);
 
     const cookieValue = `${encodeURIComponent(
       'bb-locale'
@@ -34,24 +36,31 @@ export class LocalesService {
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
+    console.log(`Set cookie: ${cookieValue}`);
 
     if (locale !== currentLocale) {
       // Force reload with the new locale
       const currentPath = this.document.location.pathname;
+      console.log(`Current path: ${currentPath}`);
       const localePattern = new RegExp(`^${baseHref}/${currentLocale}/`);
+      console.log(`Locale pattern: ${localePattern}`);
       
       let newPath;
       if (localePattern.test(currentPath)) {
         // Replace current locale in the path
         newPath = currentPath.replace(localePattern, `${baseHref}/${locale}/`);
+        console.log(`Replacing locale in path: ${newPath}`);
       } else {
         // Add new locale to the path
         newPath = `${baseHref}/${locale}${currentPath.startsWith(baseHref) ? currentPath.substring(baseHref.length) : currentPath}`;
+        console.log(`Adding locale to path: ${newPath}`);
       }
       
       // Preserve query parameters and hash
       const queryAndHash = this.document.location.search + this.document.location.hash;
-      this.document.location.href = newPath + queryAndHash;
+      const finalUrl = newPath + queryAndHash;
+      console.log(`Redirecting to: ${finalUrl}`);
+      this.document.location.href = finalUrl;
     }
   }
 
