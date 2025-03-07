@@ -76,12 +76,25 @@ export class LocalesService implements OnInit {
 
   private getCookieValue(name: string): string | null {
     const cookies = this.document.cookie.split(';');
+    console.log('All cookies:', this.document.cookie);
+    
     for (const cookie of cookies) {
-      const [cookieName, cookieValue] = cookie.trim().split('=');
+      if (!cookie.trim()) continue;
+      
+      const parts = cookie.trim().split('=');
+      const cookieName = parts[0].trim();
+      const cookieValue = parts.length > 1 ? parts[1].trim() : '';
+      
+      console.log(`Checking cookie: ${cookieName} = ${cookieValue}`);
+      
       if (cookieName === name || cookieName === encodeURIComponent(name)) {
-        return decodeURIComponent(cookieValue);
+        const decodedValue = decodeURIComponent(cookieValue);
+        console.log(`Found cookie ${name} with value ${decodedValue}`);
+        return decodedValue;
       }
     }
+    
+    console.log(`Cookie ${name} not found`);
     return null;
   }
 
@@ -121,6 +134,13 @@ export class LocalesService implements OnInit {
     
     // Escape special characters in baseHref for regex
     const escapedBaseHref = baseHref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // First check if the path already contains the target locale
+    const targetLocalePattern = new RegExp(`^${escapedBaseHref}/${locale}(/|$)`);
+    if (targetLocalePattern.test(currentPath)) {
+      console.log(`Path already contains the target locale ${locale}, no need to change URL`);
+      return; // No need to redirect if we're already on the correct locale
+    }
     
     for (const availableLocale of this.availableLocales) {
       // Create a pattern that matches the locale at the beginning of the path or after baseHref
