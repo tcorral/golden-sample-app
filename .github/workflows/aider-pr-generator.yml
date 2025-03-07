@@ -33,16 +33,27 @@ jobs:
       id: extract-sections
       run: |
         # Extract and clean markdown content
-        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g; s/\*\*//g; s/^[#* -]*//')
+        BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\\r//g; s/^## //; s/^\* //; s/\*\*//g')
         
-        # Extract components using awk with markdown-aware parsing
-        DESCRIPTION=$(echo "$BODY" | awk '/Description/{flag=1; next} /Files to modify|Acceptance criteria/{flag=0} flag')
-        FILES=$(echo "$BODY" | awk '/Files to modify/{flag=1; next} /Acceptance criteria/{flag=0} flag' | 
-                sed -e 's/^ *//' -e '/^$/d' | xargs -n 1 sh -c '[ -f "$0" ] && echo "$0"')
-        ACCEPTANCE=$(echo "$BODY" | awk '/Acceptance criteria/{flag=1; next} /```|^$/{flag=0} flag' | 
-                    tr '\n' ' ' | sed 's/  \+/ /g')
+        # Extract components using improved markdown parsing
+        DESCRIPTION=$(echo "$BODY" | awk '/^Description/{flag=1; next} /^Files to modify|^Acceptance criteria/{flag=0} flag' | sed '/^$/d')
+        FILES=$(echo "$BODY" | awk '/^Files to modify/{flag=1; next} /^Acceptance criteria/{flag=0} flag' | 
+                sed -e 's/^ *//' -e '/^$/d' | while read -r line; do
+                  if [ -d "$line" ]; then
+                    find "$line" -type f
+                  else
+                    echo "$line"
+                  fi
+                done | sort -u | tr '\n' ' ')
+        ACCEPTANCE=$(echo "$BODY" | awk '/^Acceptance criteria/{flag=1; next} /^```|^$/{flag=0} flag' | tr '\n' ' ' | sed 's/  \+/ /g')
 
-        # Create single-line prompt with context preservation
+        # Validate required content
+        if [ -z "$FILES" ]; then
+          echo "Error: No valid files found to modify"
+          exit 1
+        fi
+
+        # Create prompt with proper quoting
         PROMPT=$(printf "######## PROBLEM STATEMENT ########\n%s\n\n######## TECHNICAL REQUIREMENTS ########\n%s\n\n######## FILES TO MODIFY ########\n%s\n\n######## IMPLEMENTATION NOTES ########\n- Fix all issues in ONE commit\n- Maintain Angular coding standards\n- Add necessary TypeScript interfaces\n- Update related test files" \
                 "$DESCRIPTION" "$ACCEPTANCE" "$FILES")
 
