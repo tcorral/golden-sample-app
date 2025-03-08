@@ -97,3 +97,8 @@ jobs:
       - name: Log parsed result
         run: |
           echo "Parsed description: ${{ steps.parse-description.outputs.parsed_description }}"
+      
+      - name: Run Aider with Parsed Description
+        run: |
+          pip install aider-chat  # Ensure aider is installed
+          echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --model sonnet
