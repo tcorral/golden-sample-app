@@ -121,12 +121,59 @@ jobs:
           # Save branch name for later steps
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Run Aider with Parsed Description
+      - name: Resolve Files to Modify
+        id: resolve-files
+        run: |
+            # Extract issue number and description
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_BODY="${{ github.event.issue.body }}"
+  
+            # Extract "Files to Modify" section
+            FILES_SECTION=$(echo "$ISSUE_BODY" | awk '/## Files to Modify/{flag=1; next} /## /{flag=0} flag' | xargs)
+  
+            # Debug: Log extracted section
+            echo "Extracted Files to Modify Section: $FILES_SECTION"
+  
+            # If no files specified, let Aider decide
+            if [[ -z "$FILES_SECTION" ]]; then
+              echo "No files specified, letting Aider decide."
+              echo "FILES_TO_MODIFY=" >> $GITHUB_ENV
+              exit 0
+            fi
+  
+            # Resolve folders, globs, and individual files
+            RESOLVED_FILES=""
+            for item in $FILES_SECTION; do
+              if [[ -d "$item" ]]; then
+                # If it's a directory, get all files inside
+                FOUND_FILES=$(find "$item" -type f)
+              elif [[ "$item" == *"*"* ]]; then
+                # If it's a glob pattern, resolve matching files
+                FOUND_FILES=$(ls $item 2>/dev/null || echo "")
+              else
+                # Assume it's an individual file
+                FOUND_FILES=$item
+              fi
+              RESOLVED_FILES="$RESOLVED_FILES $FOUND_FILES"
+            done
+  
+            # Trim whitespace and save resolved files
+            RESOLVED_FILES=$(echo "$RESOLVED_FILES" | xargs)
+            echo "Resolved Files: $RESOLVED_FILES"
+            echo "FILES_TO_MODIFY=$RESOLVED_FILES" >> $GITHUB_ENV
+
+      - name: Run Aider with Resolved Files
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          pip install aider-chat  # Ensure aider is installed
-          echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet
+            pip install aider-chat
+            if [[ -z "${{ env.FILES_TO_MODIFY }}" ]]; then
+              echo "Letting Aider decide files."
+              echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet
+            else
+              echo "Passing resolved files to Aider."
+              echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet ${{ env.FILES_TO_MODIFY }}
+            fi
   
       - name: Push Aider Changes
         run: |
