@@ -18,11 +18,18 @@ export class LocaleSelectorComponent implements OnInit {
   ) {}
 
   set language(value: string | object | Locale | undefined) {
+    // If it's a string, it might be a locale code
     if (typeof value === 'string') {
+      const localeObj = this.findLocale(value);
+      if (localeObj) {
+        this.currentLanguage = localeObj;
+        this.localeService.setLocale(this.currentLanguage.code);
+      }
       return;
     }
     
-    if (value && 'code' in value) {
+    // If it's an object with a code property (Locale type)
+    if (value && typeof value === 'object' && 'code' in value) {
       this.currentLanguage = value as Locale;
       this.localeService.setLocale(this.currentLanguage.code);
     }

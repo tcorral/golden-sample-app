@@ -56,7 +56,7 @@ export class LocalesService {
       }
       
       // Force page reload with the new locale
-      this.document.location.href = newUrl;
+      window.location.href = newUrl;
     }
   }
 
