@@ -15,22 +15,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
           
-      - name: Create package.json for dependencies
+      - name: Install marked package
         run: |
-          echo '{
-            "name": "issue-parser",
-            "version": "1.0.0",
-            "private": true,
-            "dependencies": {
-              "@actions/github": "^5.1.1",
-              "@actions/core": "^1.10.1",
-              "marked": "^9.1.5"
-            }
-          }' > package.json
-          
-      - name: Install dependencies
-        run: npm install
+          npm install marked
         
       - name: Parse issue description
         id: parse-description
@@ -38,7 +27,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
+            const fs = require('fs');
+            const path = require('path');
+            // NOTE: actions/github-script already provides core and github
             const { marked } = require('marked');
             
             const issue = context.payload.issue;
@@ -47,28 +38,8 @@ jobs:
               return;
             }
             
-            // Function to convert markdown to plain text
-            function markdownToPlainText(markdown) {
-              const renderer = new marked.Renderer();
-              
-              // Override rendering functions to extract plain text
-              renderer.strong = text => text;
-              renderer.em = text => text;
-              renderer.codespan = text => text;
-              renderer.code = (text) => text;
-              renderer.link = (href, title, text) => text;
-              renderer.list = (body) => body;
-              renderer.listitem = text => `${text} `;
-              renderer.paragraph = text => text;
-              renderer.heading = text => text;
-              renderer.br = () => ' ';
-              renderer.hr = () => '';
-              renderer.table = (header, body) => `${header} ${body}`;
-              renderer.tablerow = content => content;
-              renderer.tablecell = content => `${content} `;
-              
-              return marked(markdown, { renderer });
-            }
+            // Debug: Log issue body
+            console.log('Issue body:', issue.body);
             
             // Extract sections from markdown
             function extractSections(markdown) {
@@ -76,26 +47,48 @@ jobs:
               const sectionRegex = /^##\s+(.+)$/gm;
               const sections = {};
               
-              // Split content by headings
-              const parts = markdown.split(sectionRegex);
+              // Find all section headings and their positions
+              const headings = [...markdown.matchAll(sectionRegex)];
               
-              // First part is anything before the first heading (usually empty)
-              parts.shift();
-              
-              // Process remaining parts (heading, content, heading, content, ...)
-              for (let i = 0; i < parts.length; i += 2) {
-                if (i + 1 < parts.length) {
-                  const sectionName = parts[i].trim();
-                  const sectionContent = parts[i + 1].trim();
-                  
-                  // Convert section content from markdown to plain text
-                  const plainText = markdownToPlainText(sectionContent)
-                    .replace(/\n+/g, ' ')  // Replace newlines with spaces
-                    .replace(/\s+/g, ' ')  // Normalize spaces
-                    .trim();
-                    
-                  sections[sectionName] = plainText;
-                }
+              // Process each section
+              for (let i = 0; i < headings.length; i++) {
+                const currentHeading = headings[i];
+                const nextHeading = headings[i + 1];
+                
+                const sectionName = currentHeading[1].trim();
+                const startPos = currentHeading.index + currentHeading[0].length;
+                const endPos = nextHeading ? nextHeading.index : markdown.length;
+                
+                // Extract section content
+                const sectionContent = markdown.substring(startPos, endPos).trim();
+                
+                // Process the content to remove line breaks and normalize spaces
+                // First, transform markdown to plain text
+                const renderer = new marked.Renderer();
+                
+                // Store the plain text result
+                let plainText = '';
+                
+                // Override render methods to extract plain text
+                renderer.paragraph = (text) => { plainText += text + ' '; return ''; };
+                renderer.list = (body) => { plainText += body + ' '; return ''; };
+                renderer.listitem = (text) => { return text + ' '; };
+                renderer.br = () => { return ' '; };
+                renderer.strong = (text) => { return text; };
+                renderer.em = (text) => { return text; };
+                renderer.codespan = (text) => { return text; };
+                renderer.blockquote = (quote) => { return quote + ' '; };
+                
+                // Render to extract plain text
+                marked(sectionContent, { renderer });
+                
+                // Clean up the text (remove multiple spaces, normalize line breaks)
+                plainText = plainText
+                  .replace(/\n+/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                
+                sections[sectionName] = plainText;
               }
               
               return sections;
@@ -104,6 +97,9 @@ jobs:
             try {
               // Extract sections from markdown
               const parsedSections = extractSections(issue.body);
+              
+              // Debug: Log parsed sections
+              console.log('Parsed sections:', JSON.stringify(parsedSections, null, 2));
               
               // Format the result as a single string
               let formattedResult = '';
@@ -127,8 +123,8 @@ jobs:
               
               console.log('Successfully parsed issue description');
             } catch (error) {
+              console.error('Error details:', error);
               core.setFailed(`Error parsing issue description: ${error.message}`);
-              console.error(error);
             }
 
       - name: Log parsed result
