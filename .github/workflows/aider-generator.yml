@@ -1,8 +1,14 @@
 name: Aider Issue Processor
 
+# Define explicit permissions
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
 on:
   issues:
-    types: [opened, edited, labeled]
+    types: [labeled]
 jobs:
   aider-issue-processor:
     runs-on: ubuntu-latest
@@ -128,11 +134,9 @@ jobs:
             ISSUE_NUMBER="${{ github.event.issue.number }}"
             ISSUE_BODY="${{ github.event.issue.body }}"
   
-            # Extract "Files to Modify" section
-            FILES_SECTION=$(echo "$ISSUE_BODY" | awk '/## Files to Modify/{flag=1; next} /## /{flag=0} flag' | xargs)
-  
-            # Debug: Log extracted section
-            echo "Extracted Files to Modify Section: $FILES_SECTION"
+            # Extract "Files to Modify" section - use IFS to handle spaces properly
+            FILES_SECTION=$(echo "$ISSUE_BODY" | awk '/## Files to Modify/{flag=1; next} /## /{flag=0} flag')
+            echo "Extracted Files to Modify Section: '$FILES_SECTION'"
   
             # If no files specified, let Aider decide
             if [[ -z "$FILES_SECTION" ]]; then
