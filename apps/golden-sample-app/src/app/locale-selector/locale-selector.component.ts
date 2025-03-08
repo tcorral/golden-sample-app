@@ -21,8 +21,11 @@ export class LocaleSelectorComponent implements OnInit {
     if (typeof value === 'string') {
       return;
     }
-
-    this.localeService.setLocale((value as Locale).code);
+    
+    if (value && 'code' in value) {
+      this.currentLanguage = value as Locale;
+      this.localeService.setLocale(this.currentLanguage.code);
+    }
   }
 
   get language(): Locale | undefined {
@@ -31,18 +34,37 @@ export class LocaleSelectorComponent implements OnInit {
 
   ngOnInit() {
     this.localesCatalog = this.locales.reduce(
-      (acc: Locale[], locale) => [...acc, localesCatalog[locale]],
+      (acc: Locale[], locale) => {
+        if (localesCatalog[locale]) {
+          return [...acc, localesCatalog[locale]];
+        }
+        return acc;
+      },
       []
     );
 
     this.currentLanguage = this.findLocale(this.localeService.currentLocale);
+    
+    // If no locale is found, use the first available one
+    if (!this.currentLanguage && this.localesCatalog.length > 0) {
+      this.currentLanguage = this.localesCatalog[0];
+    }
   }
 
   private findLocale(locale: string): Locale | undefined {
-    if (this.locales.includes(locale)) {
+    // First try exact match
+    if (this.locales.includes(locale) && localesCatalog[locale]) {
       return localesCatalog[locale];
     }
-
+    
+    // Then try matching just the language part (e.g., 'en' from 'en-US')
+    const langCode = locale.split('-')[0];
+    const matchingLocale = this.locales.find(l => l.startsWith(langCode));
+    
+    if (matchingLocale && localesCatalog[matchingLocale]) {
+      return localesCatalog[matchingLocale];
+    }
+    
     return undefined;
   }
 }

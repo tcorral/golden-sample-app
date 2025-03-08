@@ -31,23 +31,32 @@ export class LocalesService {
     )}=${encodeURIComponent(locale)}`;
     const cookiePath = `path=${baseHref === '' ? '/' : baseHref}`;
 
+    // Set the cookie with the new locale
     this.document.cookie = [cookieValue, cookiePath, COOKIE_ATTRIBUTES].join(
       '; '
     );
 
     if (locale !== currentLocale) {
       const fullPath = this.location.path(true);
-      const basePathRegex = new RegExp(`^${baseHref}/${currentLocale}/?`);
-
-      // Check if path includes base href and locale
-      if (!basePathRegex.test(fullPath)) {
-        return;
+      
+      // Create a more flexible regex to match the current locale in the path
+      const basePathRegex = new RegExp(`^${baseHref}/?${currentLocale}/?`);
+      
+      // If the path doesn't include the current locale, we'll need to reload the page
+      // with the new locale
+      let newUrl = '';
+      
+      if (basePathRegex.test(fullPath)) {
+        // Get path without base href and locale
+        const path = fullPath.replace(basePathRegex, '');
+        newUrl = `${baseHref}/${locale}/${path}`;
+      } else {
+        // If we can't find the locale in the path, just add the new locale to the current path
+        newUrl = `${baseHref}/${locale}${fullPath}`;
       }
-
-      // Get path without base href and locale
-      const path = fullPath.replace(basePathRegex, '');
-
-      this.document.location.href = `${baseHref}/${locale}/${path}`;
+      
+      // Force page reload with the new locale
+      this.document.location.href = newUrl;
     }
   }
 
