@@ -135,7 +135,7 @@ jobs:
             ISSUE_BODY="${{ github.event.issue.body }}"
         
             # Extract "Files to Modify" section (clean markdown bullets)
-            FILES_SECTION=$(echo "$ISSUE_BODY" | awk '/## Files to Modify/{flag=1; next} /## /{flag=0} flag' | sed 's/^\* //g' | xargs)
+            FILES_SECTION=$(echo "$ISSUE_BODY" | sed -n '/## Files to modify/,/## /p' | sed '1d;$d' | sed 's/^\* //g' | xargs)
         
             # Debug: Log extracted section
             echo "Extracted Files to Modify Section: $FILES_SECTION"
@@ -166,7 +166,7 @@ jobs:
             # Trim whitespace and save resolved files
             RESOLVED_FILES=$(echo "$RESOLVED_FILES" | xargs)
             echo "Resolved Files: $RESOLVED_FILES"
-            echo "FILES_TO_MODIFY=$RESOLVED_FILES" >> $GITHUB_ENV 
+            echo "FILES_TO_MODIFY=$RESOLVED_FILES" >> $GITHUB_ENV         
 
       - name: Run Aider with Resolved Files
         env:
