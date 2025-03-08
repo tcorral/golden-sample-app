@@ -101,4 +101,4 @@ jobs:
       - name: Run Aider with Parsed Description
         run: |
           pip install aider-chat  # Ensure aider is installed
-          echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --model sonnet
+          echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet
