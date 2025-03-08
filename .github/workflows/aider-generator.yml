@@ -97,7 +97,10 @@ jobs:
       - name: Log parsed result
         run: |
           echo "Parsed description: ${{ steps.parse-description.outputs.parsed_description }}"
-      
+            
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Create and Switch to a New Branch
         run: |
           # Extract issue number and title
