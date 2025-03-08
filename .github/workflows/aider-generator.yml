@@ -144,4 +144,6 @@ jobs:
                 --base main \
                 --head ${{ env.BRANCH_NAME }} \
                 --title "Fix #$ISSUE_NUMBER: $ISSUE_TITLE" \
-                --body "This PR resolves issue #$ISSUE_NUMBER by applying the requested changes using Aider."
+                --body "This PR resolves issue #$ISSUE_NUMBER by applying the requested changes using Aider." \
+                --label "aider-generated" \
+                --draft
