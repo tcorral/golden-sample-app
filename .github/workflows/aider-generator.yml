@@ -124,3 +124,11 @@ jobs:
         run: |
           pip install aider-chat  # Ensure aider is installed
           echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet
+  
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git add .
+          git commit -m "Apply Aider changes for issue #${{ github.event.issue.number }}"
+          git push origin ${{ env.BRANCH_NAME }}
