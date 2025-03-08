@@ -99,6 +99,8 @@ jobs:
           echo "Parsed description: ${{ steps.parse-description.outputs.parsed_description }}"
       
       - name: Run Aider with Parsed Description
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           pip install aider-chat  # Ensure aider is installed
           echo "${{ steps.parse-description.outputs.parsed_description }}" | aider --yes-always --model sonnet
