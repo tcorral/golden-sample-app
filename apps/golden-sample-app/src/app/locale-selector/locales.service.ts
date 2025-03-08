@@ -49,10 +49,10 @@ export class LocalesService {
       if (basePathRegex.test(fullPath)) {
         // Get path without base href and locale
         const path = fullPath.replace(basePathRegex, '');
-        newUrl = `${baseHref}/${locale}/${path}`;
+        newUrl = `${baseHref}/${locale}/${path}`.replace(/\/+/g, '/');
       } else {
         // If we can't find the locale in the path, just add the new locale to the current path
-        newUrl = `${baseHref}/${locale}${fullPath}`;
+        newUrl = `${baseHref}/${locale}${fullPath}`.replace(/\/+/g, '/');
       }
       
       // Force page reload with the new locale
