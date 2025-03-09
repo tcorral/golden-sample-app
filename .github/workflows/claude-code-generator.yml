@@ -127,54 +127,69 @@ jobs:
           # Save branch name for later steps
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Create necessary files
+      - name: Create run.sh script
         run: |
           mkdir -p .github/workflows
-          cat > .github/workflows/run.js << 'EOL'
-          const fs = require('fs');
-          const { execSync } = require('child_process');
-      
-          const inputText = process.env.INPUT_TEXT || '';
-          const apiKey = process.env.ANTHROPIC_API_KEY || '';
-      
-          // Write the input to a file
-          fs.writeFileSync('/tmp/input.txt', inputText);
-      
-          // Set environment variables for claude-code
-          process.env.INK_DISABLE_SET_RAW_MODE = 'true';
-      
-          try {
-            // Run claude-code with appropriate flags for non-interactive usage
-            const result = execSync('claude-code run --input-file=/tmp/input.txt --api-key=' + apiKey, {
-              env: {
-                ...process.env,
-                INK_DISABLE_SET_RAW_MODE: 'true',
-              },
-            });
+          cat > .github/workflows/run.sh << 'EOL'
+          #!/bin/bash
+          set -e
+
+          # Debug: show environment
+          echo "Current working directory: $(pwd)"
+          echo "PATH: $PATH"
+          echo "Node modules: $(npm root -g)"
+
+          # Try to find claude-code
+          CLAUDE_CODE_PATH=$(find $(npm root -g) -name "claude-code" -type f 2>/dev/null | head -n 1)
+
+          if [ -z "$CLAUDE_CODE_PATH" ]; then
+            echo "Could not find claude-code executable. Installing now..."
+            npm install -g @anthropic-ai/claude-code
             
-            console.log(result.toString());
-          } catch (error) {
-            console.error('Error executing claude-code:', error.message);
-            process.exit(1);
-          }
+            # Try again after installation
+            CLAUDE_CODE_PATH=$(find $(npm root -g) -name "claude-code" -type f 2>/dev/null | head -n 1)
+            
+            if [ -z "$CLAUDE_CODE_PATH" ]; then
+              echo "ERROR: Still could not find claude-code after installation!"
+              ls -la $(npm root -g)/@anthropic-ai/claude-code || echo "Claude-code directory not found"
+              exit 1
+            fi
+          fi
+
+          echo "Found claude-code at: $CLAUDE_CODE_PATH"
+
+          # Write input to file
+          echo "$INPUT_TEXT" > /tmp/input.txt
+
+          # Set environment variables
+          export INK_DISABLE_SET_RAW_MODE=true
+
+          # Run claude-code
+          echo "Running claude-code..."
+          node "$CLAUDE_CODE_PATH" run --input-file=/tmp/input.txt --api-key="$ANTHROPIC_API_KEY" --no-interactive
           EOL
-      
+          chmod +x .github/workflows/run.sh
+
           cat > .github/workflows/Dockerfile << 'EOL'
           FROM node:18-slim
-      
+
+          # Install findutils for the 'find' command
+          RUN apt-get update && apt-get install -y findutils
+
           # Install claude-code globally
           RUN npm install -g @anthropic-ai/claude-code
-      
+
           WORKDIR /app
-      
-          # Copy the Node.js script
-          COPY run.js /app/run.js
-      
+
+          # Copy the bash script
+          COPY run.sh /app/run.sh
+          RUN chmod +x /app/run.sh
+
           # Set environment variable to disable raw mode
           ENV INK_DISABLE_SET_RAW_MODE=true
-      
-          # Run the Node.js script directly
-          CMD ["node", "/app/run.js"]
+
+          # Run the script
+          ENTRYPOINT ["/app/run.sh"]
           EOL
 
       - name: Build Docker image for claude-code
