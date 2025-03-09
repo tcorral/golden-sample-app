@@ -130,9 +130,9 @@ jobs:
       - name: Run Claude Code
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          NODE_NO_READLINE: 1
+          INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          echo "${{ steps.parse-description.outputs.parsed_description }}" | npx @anthropic-ai/claude-code -p
+          npx @anthropic-ai/claude-code -p "$INPUT_TEXT"
   
       - name: Push Claude Code Changes
         run: |
