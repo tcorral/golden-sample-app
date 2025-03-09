@@ -14,6 +14,9 @@ jobs:
           node-version: '20'
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
+      
+      - name: Install Expect
+        run: sudo apt-get update && sudo apt-get install -y expect
         
       - name: Ensure script is executable
         run: chmod +x .github/workflows/claude-script.exp
