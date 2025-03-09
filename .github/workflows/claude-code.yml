@@ -18,6 +18,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          claude config set --global theme dark
+          claude config set --global autoUpdaterStatus disabled
           claude config add allowedTools Edit
           claude config add allowedTools Replace
           claude -p "generate a Dockerfile for a Node.js app"
