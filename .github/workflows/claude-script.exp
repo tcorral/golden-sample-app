@@ -1,6 +1,11 @@
 #!/usr/bin/expect -f
+log_user 1  ;# Enable logging
 set timeout -1
 spawn claude -p "Generate a Dockerfile for a Node.js 22 app"
 expect "^"
 # send "\x04"  # Ctrl+D to exit
-expect eof
+# Wait for output and automatically exit when done
+expect {
+    eof { puts "Claude execution completed."; exit 0 }
+    timeout { puts "Claude timed out."; exit 1 }
+}
