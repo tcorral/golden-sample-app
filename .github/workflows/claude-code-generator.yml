@@ -134,11 +134,9 @@ jobs:
           RUN apt-get update && apt-get install -y util-linux
           RUN npm install -g @anthropic-ai/claude-code
           WORKDIR /app
-          RUN cat << 'EOF2' > run.sh
-          #!/bin/bash
-          script -q -c "bash -c 'claude -p <<< \"${INPUT_TEXT}\"'"
-          EOF2
-          RUN chmod +x run.sh
+          RUN echo '#!/bin/bash' > run.sh && \
+              echo 'script -q -c "bash -c '\''claude -p <<< \"${INPUT_TEXT}\"'\''"' >> run.sh && \
+              chmod +x run.sh
           ENTRYPOINT ["/app/run.sh"]
           EOF
   
@@ -151,7 +149,7 @@ jobs:
             -e ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
             -e INPUT_TEXT="${{ steps.parse-description.outputs.parsed_description }}" \
             claude-code-runner
-  
+        
       - name: Push Claude Code Changes
         run: |
           git push origin ${{ env.BRANCH_NAME }}
