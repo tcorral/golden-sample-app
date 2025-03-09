@@ -131,22 +131,21 @@ jobs:
         run: |
           docker build -t claude-code-runner - <<'EOF'
           FROM node:18-slim
-          # Install claude-code globally
+          RUN apt-get update && apt-get install -y util-linux
           RUN npm install -g @anthropic-ai/claude-code
           WORKDIR /app
-          # Create an entrypoint script that feeds INPUT_TEXT via a here-string
           RUN echo '#!/bin/bash' > run.sh && \
-              echo 'claude -p <<< "$INPUT_TEXT"' >> run.sh && \
+              echo 'script -q -c "claude -p <<< \"$INPUT_TEXT\""' >> run.sh && \
               chmod +x run.sh
           ENTRYPOINT ["/app/run.sh"]
           EOF
   
-      - name: Run claude-code in Docker container with interactive TTY
+      - name: Run claude-code in Docker container with simulated TTY
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          docker run --rm -it \
+          docker run --rm -i \
             -e ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
             -e INPUT_TEXT="${{ steps.parse-description.outputs.parsed_description }}" \
             claude-code-runner
