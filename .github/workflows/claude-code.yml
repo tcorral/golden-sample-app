@@ -18,14 +18,4 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude config set --global theme dark 
-          claude config set hasTrustDialogAccepted true 
-          claude config add allowedTools Edit
-          claude config add allowedTools Replace
-          claude config add allowedTools "Bash(npm install)"
-          claude config add allowedTools "Bash(npm test)"
-          claude config add allowedTools "Bash(npm run build)"
-          claude config add allowedTools "Bash(npm run start:mocks)"
-          claude config add ignorePatterns node_modules
-          claude config add ignorePatterns "node_modules/**"
-          claude -p "Generate a Dockerfile for Node 22"
+          ./claude-script.exp
