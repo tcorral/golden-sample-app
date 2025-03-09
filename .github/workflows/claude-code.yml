@@ -1,8 +1,11 @@
 name: Claude Code Automation
-on: [push]
+on:
+    issues:
+      types: [labeled]
 jobs:
   run-claude:
     runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'claude-code')
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
