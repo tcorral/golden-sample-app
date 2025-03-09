@@ -17,4 +17,4 @@ jobs:
       - name: Execute Claude Code
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: claude- --prompt "generate a Dockerfile for a Node.js app"
+        run: claude --prompt "generate a Dockerfile for a Node.js app"
