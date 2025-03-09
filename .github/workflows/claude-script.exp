@@ -2,5 +2,5 @@
 set timeout -1
 spawn claude -p "Generate a Dockerfile for a Node.js 22 app"
 expect "^"
-send "\x04"  # Ctrl+D to exit
+# send "\x04"  # Ctrl+D to exit
 expect eof
