@@ -14,8 +14,12 @@ jobs:
           node-version: '20'
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
+        
+      - name: Ensure script is executable
+        run: chmod +x .github/workflows/claude-script.exp
+
       - name: Execute Claude Code
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          ./.github/workflows/claude-script.exp
+          expect .github/workflows/claude-script.exp
