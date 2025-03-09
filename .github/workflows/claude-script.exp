@@ -1,4 +1,5 @@
 #!/usr/bin/expect -f
+log_user 1   ;# Enable logging to stdout
 set timeout 300
 # Get the command-line argument (the prompt)
 set prompt [lindex $argv 0]

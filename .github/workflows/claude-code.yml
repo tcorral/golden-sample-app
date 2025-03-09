@@ -146,11 +146,23 @@ jobs:
         run: |
           expect .github/workflows/claude-script.exp "${{ steps.parse-description.outputs.parsed_description }}"
 
-      - name: Push Aider Changes
+      - name: Check for changes
+        id: git-check
         run: |
+          git status --porcelain
+          echo "HAS_CHANGES=$(if git status --porcelain | grep .; then echo "true"; else echo "false"; fi)" >> $GITHUB_ENV
+        
+      - name: Commit changes
+        if: env.HAS_CHANGES == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Claude Code changes for issue #${{ github.event.issue.number }}"
           git push origin ${{ env.BRANCH_NAME }}
 
       - name: Create Pull Request
+        if: env.HAS_CHANGES == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -163,3 +175,10 @@ jobs:
                 --head ${{ env.BRANCH_NAME }} \
                 --title "Fix #$ISSUE_NUMBER: $ISSUE_TITLE" \
                 --body "This PR resolves issue #$ISSUE_NUMBER by applying the requested changes using Claude."
+
+      - name: Report no changes
+        if: env.HAS_CHANGES == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} --body "Claude Code was executed but no changes were made to the codebase. This might be because Claude couldn't understand the request or no changes were needed."
