@@ -1,9 +1,16 @@
 name: Claude Code Automation
+
+# Define explicit permissions
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 on:
-    issues:
-      types: [labeled]
+  issues:
+    types: [labeled]
 jobs:
-  run-claude:
+  claude-issue-processor:
     runs-on: ubuntu-latest
     if: contains(github.event.issue.labels.*.name, 'claude-code')
     steps:
@@ -17,7 +24,7 @@ jobs:
       
       - name: Install Expect
         run: sudo apt-get update && sudo apt-get install -y expect
-        
+
       - name: Ensure script is executable
         run: chmod +x .github/workflows/claude-script.exp
 
@@ -26,3 +33,21 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           expect .github/workflows/claude-script.exp
+
+      - name: Push Aider Changes
+        run: |
+          git push origin ${{ env.BRANCH_NAME }}
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+
+            # Create a pull request
+            gh pr create \
+                --base main \
+                --head ${{ env.BRANCH_NAME }} \
+                --title "Fix #$ISSUE_NUMBER: $ISSUE_TITLE" \
+                --body "This PR resolves issue #$ISSUE_NUMBER by applying the requested changes using Claude."
