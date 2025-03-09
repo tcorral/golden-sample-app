@@ -131,8 +131,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          npm install -g @anthropic-ai/claude-code
-          echo "${{ steps.parse-description.outputs.parsed_description }}" | claude -p
+          echo "${{ steps.parse-description.outputs.parsed_description }}" | npx @anthropic-ai/claude-code -p
   
       - name: Push Claude Code Changes
         run: |
