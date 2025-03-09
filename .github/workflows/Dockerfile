@@ -9,7 +9,7 @@ RUN npm install -g @anthropic-ai/claude-code
 WORKDIR /app
 
 # Copy the entrypoint script into the container.
-COPY run.sh /app/run.sh
+COPY .github/workflows/run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
 ENTRYPOINT ["/app/run.sh"]

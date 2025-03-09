@@ -129,7 +129,7 @@ jobs:
 
       - name: Build Docker image for claude-code
         run: |
-          docker build -t claude-code-runner -f .github/workflows/Dockerfile .
+          docker build -t claude-code-runner .github/workflows/
       
       - name: Run claude-code in Docker container with simulated TTY
         env:
