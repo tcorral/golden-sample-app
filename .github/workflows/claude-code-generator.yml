@@ -127,13 +127,18 @@ jobs:
           # Save branch name for later steps
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Run Claude Code
+      - name: Install expect (for unbuffer)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect
+
+      - name: Run Claude Code with unbuffer
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          echo "$INPUT_TEXT" > input.txt  # Save input to a file
-          npx --yes @anthropic-ai/claude-code -p < input.txt  # Read input from file
+          echo "$INPUT_TEXT" > input.txt
+          unbuffer npx @anthropic-ai/claude-code -p < input.txt
   
       - name: Push Claude Code Changes
         run: |
