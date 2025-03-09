@@ -18,4 +18,4 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          claude config add allowedTools Edit && claude config add allowedTools Replace && claude -p "generate a Dockerfile for a Node.js app"
+          npx claude config add allowedTools Edit && npx claude config add allowedTools Replace && npx claude -p "Generate a Dockerfile for Node 22"
