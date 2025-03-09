@@ -134,12 +134,11 @@ jobs:
           RUN apt-get update && apt-get install -y util-linux
           RUN npm install -g @anthropic-ai/claude-code
           WORKDIR /app
-          RUN echo '#!/bin/bash' > run.sh && \
-              echo 'script -q -c "bash -c '\''claude -p <<< \"${INPUT_TEXT}\"'\''"' >> run.sh && \
+          RUN printf '%s\n' '#!/bin/bash' 'script -q -c "bash -c '\''claude -p <<< \"${INPUT_TEXT}\"'\''"' > run.sh && \
               chmod +x run.sh
           ENTRYPOINT ["/app/run.sh"]
           EOF
-  
+        
       - name: Run claude-code in Docker container with simulated TTY
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
