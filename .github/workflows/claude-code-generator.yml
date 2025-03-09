@@ -132,16 +132,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          echo 'const { spawnSync } = require("child_process");
-          const inputText = process.env.INPUT_TEXT || "";
-          const result = spawnSync("npx", ["@anthropic-ai/claude-code", "-p"], {
-            input: inputText,
-            stdio: ["pipe", "inherit", "inherit"], // Redirect stdin properly
-            env: { ...process.env, NODE_NO_READLINE: "1" },
-          });
-          process.exit(result.status);' > run-claude.js
-
-          node run-claude.js
+          echo "$INPUT_TEXT" > input.txt  # Save input to a file
+          npx --yes @anthropic-ai/claude-code -p < input.txt  # Read input from file
   
       - name: Push Claude Code Changes
         run: |
