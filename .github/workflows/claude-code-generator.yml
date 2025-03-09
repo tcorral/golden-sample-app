@@ -127,11 +127,6 @@ jobs:
           # Save branch name for later steps
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Install expect (for unbuffer)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y expect
-
       - name: Build Docker image for claude-code
         run: |
           docker build -t claude-code-runner - <<'EOF'
@@ -139,19 +134,19 @@ jobs:
           # Install claude-code globally
           RUN npm install -g @anthropic-ai/claude-code
           WORKDIR /app
-          # Create an entrypoint script that reads $INPUT_TEXT and pipes it to claude-code
+          # Create an entrypoint script that feeds INPUT_TEXT via a here-string
           RUN echo '#!/bin/bash' > run.sh && \
-              echo 'echo "$INPUT_TEXT" | claude -p' >> run.sh && \
+              echo 'claude -p <<< "$INPUT_TEXT"' >> run.sh && \
               chmod +x run.sh
           ENTRYPOINT ["/app/run.sh"]
           EOF
   
-      - name: Run claude-code in Docker container
+      - name: Run claude-code in Docker container with interactive TTY
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          docker run --rm -t \
+          docker run --rm -it \
             -e ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
             -e INPUT_TEXT="${{ steps.parse-description.outputs.parsed_description }}" \
             claude-code-runner
