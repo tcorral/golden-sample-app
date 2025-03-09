@@ -127,6 +127,56 @@ jobs:
           # Save branch name for later steps
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
+      - name: Create necessary files
+        run: |
+          mkdir -p .github/workflows
+          cat > .github/workflows/run.js << 'EOL'
+          const fs = require('fs');
+          const { execSync } = require('child_process');
+      
+          const inputText = process.env.INPUT_TEXT || '';
+          const apiKey = process.env.ANTHROPIC_API_KEY || '';
+      
+          // Write the input to a file
+          fs.writeFileSync('/tmp/input.txt', inputText);
+      
+          // Set environment variables for claude-code
+          process.env.INK_DISABLE_SET_RAW_MODE = 'true';
+      
+          try {
+            // Run claude-code with appropriate flags for non-interactive usage
+            const result = execSync('claude-code run --input-file=/tmp/input.txt --api-key=' + apiKey, {
+              env: {
+                ...process.env,
+                INK_DISABLE_SET_RAW_MODE: 'true',
+              },
+            });
+            
+            console.log(result.toString());
+          } catch (error) {
+            console.error('Error executing claude-code:', error.message);
+            process.exit(1);
+          }
+          EOL
+      
+          cat > .github/workflows/Dockerfile << 'EOL'
+          FROM node:18-slim
+      
+          # Install claude-code globally
+          RUN npm install -g @anthropic-ai/claude-code
+      
+          WORKDIR /app
+      
+          # Copy the Node.js script
+          COPY run.js /app/run.js
+      
+          # Set environment variable to disable raw mode
+          ENV INK_DISABLE_SET_RAW_MODE=true
+      
+          # Run the Node.js script directly
+          CMD ["node", "/app/run.js"]
+          EOL
+
       - name: Build Docker image for claude-code
         run: |
           docker build -t claude-code-runner .github/workflows/
