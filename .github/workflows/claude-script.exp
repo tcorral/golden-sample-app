@@ -1,6 +1,8 @@
 #!/usr/bin/expect -f
 set timeout -1
-spawn npx claude config add allowedTools Edit && npx claude config add allowedTools Replace && npx claude -p "Generate a Dockerfile for a Node.js 22 app"
+# Get the command-line argument (the prompt)
+set prompt [lindex $argv 0]
+spawn npx claude config add allowedTools Edit && npx claude config add allowedTools Replace && npx claude -p "$prompt"
 expect "^"
 # send "\x04"  # Ctrl+D to exit
 expect eof
