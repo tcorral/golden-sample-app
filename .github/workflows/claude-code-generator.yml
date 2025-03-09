@@ -132,13 +132,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y expect
 
-      - name: Run Claude Code with unbuffer
+      - name: Build Docker image for claude-code
+        run: |
+          docker build -t claude-code-runner - <<'EOF'
+          FROM node:18-slim
+          # Install claude-code globally
+          RUN npm install -g @anthropic-ai/claude-code
+          WORKDIR /app
+          # Create an entrypoint script that reads $INPUT_TEXT and pipes it to claude-code
+          RUN echo '#!/bin/bash' > run.sh && \
+              echo 'echo "$INPUT_TEXT" | claude -p' >> run.sh && \
+              chmod +x run.sh
+          ENTRYPOINT ["/app/run.sh"]
+          EOF
+  
+      - name: Run claude-code in Docker container
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INPUT_TEXT: ${{ steps.parse-description.outputs.parsed_description }}
         run: |
-          echo "$INPUT_TEXT" > input.txt
-          unbuffer npx @anthropic-ai/claude-code -p < input.txt
+          docker run --rm -t \
+            -e ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            -e INPUT_TEXT="${{ steps.parse-description.outputs.parsed_description }}" \
+            claude-code-runner
   
       - name: Push Claude Code Changes
         run: |
