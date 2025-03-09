@@ -1,8 +1,33 @@
 #!/usr/bin/expect -f
-set timeout -1
+set timeout 300
 # Get the command-line argument (the prompt)
 set prompt [lindex $argv 0]
-spawn npx claude config add allowedTools Edit && npx claude config add allowedTools Replace && npx claude -p "$prompt"
-expect "^"
-# send "\x04"  # Ctrl+D to exit
+
+# Configure Claude Code first
+spawn claude config add allowedTools Edit
+expect eof
+
+spawn claude config add allowedTools Replace
+expect eof
+
+# Launch Claude with the prompt
+spawn claude -p "$prompt"
+
+# Wait for Claude to complete its work
+# Look for more reliable completion indicators
+expect {
+    "I've completed the requested changes" { puts "Claude completed the changes successfully" }
+    "The task is now complete" { puts "Claude completed the changes successfully" }
+    "I've implemented the requested changes" { puts "Claude completed the changes successfully" }
+    timeout { puts "Claude took too long to respond"; exit 1 }
+}
+
+# Send confirmation if needed
+send "yes\r"
+
+# Allow time for changes to complete
+sleep 10
+
+# Send Ctrl+D to exit Claude
+send "\x04"
 expect eof
