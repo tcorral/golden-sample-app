@@ -28,6 +28,26 @@ jobs:
       - name: Ensure script is executable
         run: chmod +x .github/workflows/claude-script.exp
 
+      - name: Create and Switch to a New Branch
+        run: |
+          # Extract issue number and title
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+
+          # Format title: lowercase, replace spaces with dashes, remove special characters
+          SAFE_TITLE=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd '[:alnum:]-')
+
+          # Set branch name
+          BRANCH_NAME="claude-issue-${ISSUE_NUMBER}-${SAFE_TITLE}"
+          echo "Creating branch: $BRANCH_NAME"
+
+          git fetch origin
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+
+          # Save branch name for later steps
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
       - name: Execute Claude Code
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
