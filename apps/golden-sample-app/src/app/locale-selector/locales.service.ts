@@ -40,20 +40,23 @@ export class LocalesService {
       const fullPath = this.location.path(true);
       
       // Create a more flexible regex to match the current locale in the path
-      const basePathRegex = new RegExp(`^${baseHref}/?${currentLocale}/?`);
+      const basePathRegex = new RegExp(`^/?${currentLocale}/?`);
       
       // If the path doesn't include the current locale, we'll need to reload the page
       // with the new locale
       let newUrl = '';
       
       if (basePathRegex.test(fullPath)) {
-        // Get path without base href and locale
+        // Get path without locale
         const path = fullPath.replace(basePathRegex, '');
-        newUrl = `${baseHref}/${locale}/${path}`;
+        newUrl = `${baseHref}/${locale}${path ? '/' + path : ''}`;
       } else {
         // If we can't find the locale in the path, just add the new locale to the current path
         newUrl = `${baseHref}/${locale}${fullPath}`;
       }
+      
+      // Clean up any double slashes
+      newUrl = newUrl.replace(/\/+/g, '/');
       
       // Force page reload with the new locale
       this.document.location.href = newUrl;
