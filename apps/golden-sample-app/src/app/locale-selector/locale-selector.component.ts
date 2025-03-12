@@ -22,7 +22,7 @@ export class LocaleSelectorComponent implements OnInit {
       return;
     }
     
-    if (value && 'code' in value) {
+    if (value && typeof value === 'object' && 'code' in value) {
       this.currentLanguage = value as Locale;
       this.localeService.setLocale(this.currentLanguage.code);
     }
@@ -49,6 +49,9 @@ export class LocaleSelectorComponent implements OnInit {
     if (!this.currentLanguage && this.localesCatalog.length > 0) {
       this.currentLanguage = this.localesCatalog[0];
     }
+    
+    // Log the current language for debugging
+    console.log('Current language:', this.currentLanguage);
   }
 
   private findLocale(locale: string): Locale | undefined {
